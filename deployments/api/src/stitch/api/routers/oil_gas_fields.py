@@ -111,6 +111,17 @@ async def list_merge_candidates(
 
 
 @router.get(
+    "/merge-candidates/suggestions",
+    response_model=list[MergeCandidateView],
+    dependencies=[Depends(require_permissions(MERGE_CANDIDATE_READ))],
+)
+async def suggest_merge_candidates(
+    *, uow: UnitOfWorkDep, _user: CurrentUser
+) -> list[MergeCandidateView]:
+    return await merge_candidate_actions.list_merge_candidates(session=uow.session)
+
+
+@router.get(
     "/merge-candidates/{id}",
     response_model=MergeCandidateDetailView,
     dependencies=[Depends(require_permissions(MERGE_CANDIDATE_READ))],
