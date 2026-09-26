@@ -272,37 +272,40 @@ reboot-docker-heavy: clean-docker
 follow-stack-logs:
 	$(DOCKER_COMPOSE_DEV) --profile full logs -f
 
-.PHONY: \
-	# Workspace
-	check lint test format format-check lock-check \
-	build-all \
-	clean clean-build \
-	\
-	# Python (uv)
-	py-lint py-test py-test-exact py-format py-format-check py-lock-check py-clean-cache \
-	py-build \
-	uv-dev uv-sync uv-sync-dev \
-	uv-test-target uv-test-target-exact \
-	\
-	# Packages
-	pkg-test pkg-test-exact \
-	pkg-build-auth pkg-test-auth pkg-test-exact-auth \
-	pkg-build-client pkg-test-client pkg-test-exact-client \
-	pkg-build-models pkg-test-models pkg-test-exact-models \
-	pkg-build-ogsi pkg-test-ogsi pkg-test-exact-ogsi \
-	pkg-build-observability pkg-test-observability pkg-test-exact-observability \
-	\
-	# API
-	api-build api-test api-test-exact api-dev stack-api-dev \
-	alembic-autogenerate \
-	seed-test seed-test-exact \
-	stitch-llm-build stitch-llm-test stitch-llm-test-exact \
-	\
-	# Frontend
-	frontend frontend-install frontend-build frontend-test frontend-lint \
-	frontend-format frontend-format-check \
-	frontend-dev frontend-clean \
-	\
-	# Docker
-	clean-docker dev-docker reboot-docker reboot-docker-heavy \
-	stack-frontend-dev follow-stack-logs
+# A comment inside a backslash-continued .PHONY line swallows the rest of the
+# logical line, which left this declaration with no prerequisites at all.
+# .PHONY accumulates across lines, so one line per group keeps the grouping.
+
+# Workspace
+.PHONY: check lint test format format-check lock-check
+.PHONY: build-all
+.PHONY: clean clean-build
+
+# Python (uv)
+.PHONY: py-lint py-test py-test-exact py-format py-format-check py-lock-check py-clean-cache
+.PHONY: py-build py-deployment-test py-deployment-test-exact
+.PHONY: uv-dev uv-sync uv-sync-dev
+.PHONY: uv-test-target uv-test-target-exact
+
+# Packages
+.PHONY: pkg-build pkg-test pkg-test-exact
+.PHONY: pkg-build-auth pkg-test-auth pkg-test-exact-auth
+.PHONY: pkg-build-client pkg-test-client pkg-test-exact-client
+.PHONY: pkg-build-models pkg-test-models pkg-test-exact-models
+.PHONY: pkg-build-ogsi pkg-test-ogsi pkg-test-exact-ogsi
+.PHONY: pkg-build-observability pkg-test-observability pkg-test-exact-observability
+
+# API
+.PHONY: api-build api-test api-test-exact api-dev stack-api-dev
+.PHONY: alembic-autogenerate alembic-check
+.PHONY: seed-test seed-test-exact
+.PHONY: stitch-llm-build stitch-llm-test stitch-llm-test-exact
+
+# Frontend
+.PHONY: frontend frontend-install frontend-build frontend-test frontend-lint
+.PHONY: frontend-format frontend-format-check
+.PHONY: frontend-dev frontend-clean
+
+# Docker
+.PHONY: clean-docker dev-docker reboot-docker reboot-docker-heavy
+.PHONY: stack-frontend-dev follow-stack-logs
