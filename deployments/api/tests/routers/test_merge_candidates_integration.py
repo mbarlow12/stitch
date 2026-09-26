@@ -6,10 +6,12 @@ from unittest.mock import patch
 from httpx import AsyncClient
 import pytest
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tests.factories import ResourceCreateFactory
 from stitch.api.db import link_actions
+from stitch.api.db.config import UnitOfWork
 from stitch.api.db.model import MembershipModel, OGFieldResourceSourcePriority
 from stitch.ogsi.model import OGFieldResource, OGFieldSource
 
@@ -323,3 +325,32 @@ async def test_link_all_creates_one_candidate_per_group(
     candidates = listed.json()
     assert len(candidates) == 1
     assert candidates[0]["resource_ids"] == [id_a, id_b]
+
+
+@pytest.mark.anyio
+async def test_link_all_reports_a_failed_commit_instead_of_success(
+    integration_client: AsyncClient,
+    og_create_res_fact: ResourceCreateFactory,
+):
+    """A commit that fails must not surface as a 200 describing writes that rolled back."""
+    id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
+    id_b = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
+
+    async def failing_commit(self):
+        raise OperationalError("COMMIT", {}, Exception("connection lost"))
+
+    with (
+        patch.object(link_actions, "match", autospec=True) as match,
+        patch.object(UnitOfWork, "commit", failing_commit),
+    ):
+        match.return_value = [(id_a, id_b)]
+        resp = await integration_client.post(
+            "/oil-gas-fields/merge-candidates/link-all?apply_merges=true"
+        )
+
+    assert resp.status_code == 503, resp.text
+    assert resp.json() == {"detail": "Database unavailable."}
+
+    listed = await integration_client.get("/oil-gas-fields/merge-candidates")
+    assert listed.status_code == 200, listed.text
+    assert listed.json() == []

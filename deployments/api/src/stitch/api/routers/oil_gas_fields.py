@@ -203,6 +203,7 @@ async def link_all_merge_candidates(
                 user=user,
                 request=MergeCandidateCreateRequest(resource_ids=list(group)),
             )
+        await uow.commit()
 
     return LinkAllResponse(
         apply_merges=apply_merges,
