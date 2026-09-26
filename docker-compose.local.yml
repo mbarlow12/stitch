@@ -61,6 +61,12 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        # `stack-api-dev` runs the API on the host, so the `api` service is
+        # not in the project there. Compose refuses to load a project whose
+        # depends_on target is excluded by the active profiles, so marking
+        # this optional is what lets that mode start at all. When `api` is in
+        # the project (the `full` profile) the health condition still applies.
+        required: false
     volumes:
       - ./deployments/seed/data:/mnt/data:ro
     restart: "no"
@@ -93,4 +99,10 @@ services:
     depends_on:
       api:
         condition: service_healthy
+        # `stack-api-dev` runs the API on the host, so the `api` service is
+        # not in the project there. Compose refuses to load a project whose
+        # depends_on target is excluded by the active profiles, so marking
+        # this optional is what lets that mode start at all. When `api` is in
+        # the project (the `full` profile) the health condition still applies.
+        required: false
     profiles: ["stitch-llm", "full", "friends"]
