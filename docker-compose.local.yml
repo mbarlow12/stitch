@@ -80,6 +80,8 @@ services:
       - .env
     environment:
       LOG_LEVEL: ${STITCH_LLM_LOG_LEVEL:-info}
+      # Inside compose network, talk to the api service by name.
+      STITCH_LLM_API_BASE_URL: ${STITCH_LLM_API_BASE_URL:-http://api:8000/api/v1}
       STITCH_CLIENT_BEARER_TOKEN: ${STITCH_CLIENT_LLM_BEARER_TOKEN:?STITCH_CLIENT_LLM_BEARER_TOKEN must be set}
     healthcheck:
       test:

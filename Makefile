@@ -151,6 +151,7 @@ alembic-check:
 
 stack-api-dev:
 	SEED_API_BASE_URL=http://host.docker.internal:8000/api/v1 \
+	STITCH_LLM_API_BASE_URL=http://host.docker.internal:8000/api/v1 \
 	VITE_GIT_SHA=$(GIT_SHA) \
 	VITE_BUILD_ID=$(BUILD_ID) \
 	VITE_BUILD_TIME=$(BUILD_TIME) \
