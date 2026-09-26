@@ -66,36 +66,6 @@ services:
     restart: "no"
     profiles: ["seed", "full"]
 
-  entity-linkage:
-    build:
-      context: .
-      dockerfile: deployments/entity-linkage/Dockerfile
-    env_file:
-      - .env
-    environment:
-      LOG_LEVEL: ${ENTITY_LINKAGE_LOG_LEVEL:-info}
-      ENTITY_LINKAGE_API_BASE_URL: ${ENTITY_LINKAGE_API_BASE_URL:-http://api:8000/api/v1}
-      STITCH_CLIENT_BEARER_TOKEN: ${STITCH_CLIENT_PRIVILEGED_BEARER_TOKEN:?STITCH_CLIENT_PRIVILEGED_BEARER_TOKEN must be set}
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=2).read()\" || exit 1"
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-      start_interval: 1s
-    ports:
-      - "8001:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      api:
-        condition: service_healthy
-    profiles: ["entity-linkage", "full", "friends"]
-
   stitch-llm:
     build:
       context: .

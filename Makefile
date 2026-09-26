@@ -48,8 +48,8 @@ py-lint: uv-dev
 py-test: py-deployment-test pkg-test
 py-test-exact: py-deployment-test-exact pkg-test-exact
 
-py-deployment-test: api-test entity-linkage-test seed-test stitch-llm-test
-py-deployment-test-exact: api-test-exact entity-linkage-test-exact seed-test-exact stitch-llm-test-exact
+py-deployment-test: api-test seed-test stitch-llm-test
+py-deployment-test-exact: api-test-exact seed-test-exact stitch-llm-test-exact
 
 py-format-check: uv-dev
 	$(RUFF) format --check
@@ -63,7 +63,7 @@ py-format: uv-dev
 py-clean-cache:
 	rm -rf .ruff_cache .pytest_cache
 
-py-build: api-build entity-linkage-build stitch-llm-build pkg-build
+py-build: api-build stitch-llm-build pkg-build
 
 uv-sync:
 	$(UV) sync
@@ -152,7 +152,6 @@ alembic-check:
 
 stack-api-dev:
 	SEED_API_BASE_URL=http://host.docker.internal:8000/api/v1 \
-	ENTITY_LINKAGE_API_BASE_URL=http://host.docker.internal:8000/api/v1 \
 	VITE_GIT_SHA=$(GIT_SHA) \
 	VITE_BUILD_ID=$(BUILD_ID) \
 	VITE_BUILD_TIME=$(BUILD_TIME) \
@@ -164,13 +163,6 @@ stack-api-dev:
 		--profile friends \
 		up --build \
 		-d
-
-entity-linkage-build:
-	$(UV) build --package stitch-entity-linkage
-entity-linkage-test:
-	$(MAKE) uv-test-target PKG=stitch-entity-linkage TEST_PATH=deployments/entity-linkage
-entity-linkage-test-exact:
-	$(MAKE) uv-test-target-exact PKG=stitch-entity-linkage TEST_PATH=deployments/entity-linkage
 
 stitch-llm-build:
 	$(UV) build --package stitch-llm
