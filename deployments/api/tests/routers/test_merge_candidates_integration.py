@@ -1,6 +1,7 @@
-"""Integration tests for the merge-candidate detail endpoint (real SQLite)."""
+"""Integration tests for the merge-candidate endpoints (real SQLite)."""
 
 from collections.abc import Sequence
+from unittest.mock import patch
 
 from httpx import AsyncClient
 import pytest
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from tests.factories import ResourceCreateFactory
+from stitch.api.db import link_actions
 from stitch.api.db.model import MembershipModel, OGFieldResourceSourcePriority
 from stitch.ogsi.model import OGFieldResource, OGFieldSource
 
@@ -265,3 +267,59 @@ class TestMergeCandidateDetailIntegration:
             (id_a, "gem", "Bar"),
             (id_b, "rmi", "Foo"),
         }
+
+
+@pytest.mark.anyio
+async def test_link_all_dry_run_reports_groups_without_creating_candidates(
+    integration_client: AsyncClient,
+    og_create_res_fact: ResourceCreateFactory,
+):
+    id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
+    id_b = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
+
+    with patch.object(link_actions, "match", autospec=True) as match:
+        match.return_value = [(id_a, id_b)]
+        resp = await integration_client.post(
+            "/oil-gas-fields/merge-candidates/link-all"
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {
+        "apply_merges": False,
+        "match_groups": [[id_a, id_b]],
+        "merge_candidates_created": 0,
+        "merge_candidates_skipped": 0,
+    }
+
+    listed = await integration_client.get("/oil-gas-fields/merge-candidates")
+    assert listed.status_code == 200, listed.text
+    assert listed.json() == []
+
+
+@pytest.mark.anyio
+async def test_link_all_creates_one_candidate_per_group(
+    integration_client: AsyncClient,
+    og_create_res_fact: ResourceCreateFactory,
+):
+    id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
+    id_b = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
+
+    with patch.object(link_actions, "match", autospec=True) as match:
+        match.return_value = [(id_a, id_b)]
+        resp = await integration_client.post(
+            "/oil-gas-fields/merge-candidates/link-all?apply_merges=true"
+        )
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {
+        "apply_merges": True,
+        "match_groups": [[id_a, id_b]],
+        "merge_candidates_created": 1,
+        "merge_candidates_skipped": 0,
+    }
+
+    listed = await integration_client.get("/oil-gas-fields/merge-candidates")
+    assert listed.status_code == 200, listed.text
+    candidates = listed.json()
+    assert len(candidates) == 1
+    assert candidates[0]["resource_ids"] == [id_a, id_b]
