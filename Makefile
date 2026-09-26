@@ -5,7 +5,6 @@ DOCKER_COMPOSE_DEV := $(DOCKER_COMPOSE) -f docker-compose.local.yml
 DOCKER_COMPOSE_OTEL := $(DOCKER_COMPOSE_DEV) -f docker-compose.otel.yml
 PYTEST := $(UV) run pytest
 RUFF := $(UV) run ruff
-TEST_PKG := ./scripts/test-package.py
 
 # ---- Build metadata ---------------------------------------------------------
 
