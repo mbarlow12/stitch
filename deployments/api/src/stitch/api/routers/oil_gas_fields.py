@@ -8,6 +8,7 @@ from stitch.auth.permissions import (
     MERGE_CANDIDATE_REVIEW,
     RESOURCE_READ,
     RESOURCE_WRITE,
+    SERVICE_LLM_SUGGEST,
     SOURCE_READ_PERMISSIONS,
     SOURCE_WRITE,
 )
@@ -41,6 +42,14 @@ from stitch.api.db.utils import (
     resource_to_detail_view,
 )
 from stitch.api.permissions import licensed_sources
+from stitch.api import llm
+from stitch.api.llm import (
+    AllowedSuggestionField,
+    AzureResponsesError,
+    FieldSuggestion,
+    LLMConfigurationError,
+    ModelOutputError,
+)
 
 from stitch.ogsi.model import (
     OGFieldDetailView,
@@ -309,6 +318,32 @@ async def get_resource_detail(
     return resource_to_detail_view(
         resource=res, requested_resource_id=_requested_resource_id(id, res)
     )
+
+
+@router.get(
+    "/{id}/suggest",
+    response_model=FieldSuggestion,
+    dependencies=[Depends(require_permissions(RESOURCE_READ, SERVICE_LLM_SUGGEST))],
+)
+async def suggest_field_value(
+    *,
+    uow: UnitOfWorkDep,
+    user: CurrentUser,
+    claims: Claims,
+    id: int,
+    field: Annotated[AllowedSuggestionField, Query()],
+) -> FieldSuggestion:
+    try:
+        return await llm.suggest_field_value(
+            session=uow.session,
+            resource_id=id,
+            field=field,
+            licensed_sources=licensed_sources(claims),
+        )
+    except LLMConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    except (AzureResponsesError, ModelOutputError) as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
 
 
 @router.get(
