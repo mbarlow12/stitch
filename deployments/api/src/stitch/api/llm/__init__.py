@@ -8,7 +8,8 @@ from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any, ClassVar, Literal, get_args
 
-import httpx
+from openai import AsyncOpenAI
+from openai import APIError as OpenAIAPIError
 from pydantic import (
     AnyHttpUrl,
     BaseModel,
@@ -41,6 +42,7 @@ __all__ = [
     "LLMConfigurationError",
     "LLMServiceError",
     "ModelOutputError",
+    "get_llm_client",
     "load_suggestion_context",
     "suggest_field_value",
     "suggest_missing_field_values",
@@ -334,7 +336,7 @@ class AzureResponsesClient:
     def __init__(
         self,
         settings: LLMSettings | None = None,
-        client: httpx.AsyncClient | None = None,
+        client: AsyncOpenAI | None = None,
     ) -> None:
         self._settings = settings or get_llm_settings()
         if not self._settings.azure_openai_configured:
@@ -344,12 +346,13 @@ class AzureResponsesClient:
         assert self._settings.azure_openai_api_key is not None
         assert self._settings.azure_openai_model is not None
 
-        self._base_url = str(self._settings.azure_openai_base_url).rstrip("/")
-        self._api_key = self._settings.azure_openai_api_key.get_secret_value()
         self._model = self._settings.azure_openai_model
         self._owns_client = client is None
-        self._client = client or httpx.AsyncClient(
+        self._client = client or AsyncOpenAI(
+            base_url=str(self._settings.azure_openai_base_url),
+            api_key=self._settings.azure_openai_api_key.get_secret_value(),
             timeout=self._settings.azure_openai_timeout_seconds,
+            max_retries=0,
         )
 
     async def __aenter__(self) -> "AzureResponsesClient":
@@ -360,80 +363,42 @@ class AzureResponsesClient:
 
     async def aclose(self) -> None:
         if self._owns_client:
-            await self._client.aclose()
+            await self._client.close()
 
     async def generate_field_suggestion(
         self,
         *,
         input_messages: list[dict[str, str]],
     ) -> AzureResponsesResult:
-        request_payload = {
-            "model": self._model,
-            "input": input_messages,
-            "store": False,
-            "tools": [{"type": "web_search"}],
-        }
         try:
-            response = await self._client.post(
-                f"{self._base_url}/responses",
-                headers={
-                    "Content-Type": "application/json",
-                    "api-key": self._api_key,
-                },
-                json=request_payload,
+            response = await self._client.responses.create(
+                model=self._model,
+                input=input_messages,
+                store=False,
+                tools=[{"type": "web_search"}],
             )
-        except httpx.HTTPError as exc:
+        except OpenAIAPIError as exc:
             raise AzureResponsesError("Azure Responses request failed.") from exc
 
-        if response.is_error:
-            raise AzureResponsesError(
-                f"Azure Responses request failed with status {response.status_code}: {response.text}"
-            )
-
-        try:
-            body = response.json()
-        except ValueError as exc:
-            raise AzureResponsesError(
-                "Azure Responses returned non-JSON payload."
-            ) from exc
-        if body.get("error") is not None:
+        if response.error is not None:
             raise AzureResponsesError("Azure Responses returned an error payload.")
-
-        output_text = _extract_output_text(body)
-        if output_text is None:
+        if response.status is not None and response.status != "completed":
+            raise AzureResponsesError(
+                f"Azure Responses returned status {response.status}."
+            )
+        if not response.output_text:
             raise AzureResponsesError("Azure Responses did not return output text.")
 
         return AzureResponsesResult(
-            output_text=output_text,
-            model=body.get("model") or self._model,
-            response_payload=body,
+            output_text=response.output_text,
+            model=response.model or self._model,
+            response_payload=response.model_dump(mode="json"),
         )
 
 
-def _extract_output_text(body: dict[str, Any]) -> str | None:
-    output_text = body.get("output_text")
-    if isinstance(output_text, str):
-        return output_text
-
-    output = body.get("output")
-    if not isinstance(output, list):
-        return None
-
-    for item in output:
-        if not isinstance(item, dict):
-            continue
-        content = item.get("content")
-        if not isinstance(content, list):
-            continue
-        for content_item in content:
-            if not isinstance(content_item, dict):
-                continue
-            if content_item.get("type") in {"output_text", "text"}:
-                text = content_item.get("text")
-                if isinstance(text, str):
-                    return text
-
-    return None
+@lru_cache
+def get_llm_client() -> AzureResponsesClient:
+    return AzureResponsesClient()
 
 
 def extract_public_citations(body: dict[str, Any]) -> list[Citation]:
@@ -532,13 +497,12 @@ async def suggest_field_value(
         licensed_sources=licensed_sources,
     )
 
-    async with AzureResponsesClient() as llm_client:
-        return await _suggest_from_context(
-            llm_client=llm_client,
-            resource_id=resource_id,
-            field=field,
-            detail_view=detail_view,
-        )
+    return await _suggest_from_context(
+        llm_client=get_llm_client(),
+        resource_id=resource_id,
+        field=field,
+        detail_view=detail_view,
+    )
 
 
 async def suggest_missing_field_values(
@@ -563,17 +527,17 @@ async def suggest_missing_field_values(
     if not targets:
         return []
 
-    async with AzureResponsesClient() as llm_client:
-        return list(
-            await asyncio.gather(
-                *(
-                    _suggest_from_context(
-                        llm_client=llm_client,
-                        resource_id=resource_id,
-                        field=field,
-                        detail_view=detail_view,
-                    )
-                    for field in targets
+    llm_client = get_llm_client()
+    return list(
+        await asyncio.gather(
+            *(
+                _suggest_from_context(
+                    llm_client=llm_client,
+                    resource_id=resource_id,
+                    field=field,
+                    detail_view=detail_view,
                 )
+                for field in targets
             )
         )
+    )

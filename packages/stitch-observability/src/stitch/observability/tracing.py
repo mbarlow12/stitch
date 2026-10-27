@@ -160,6 +160,12 @@ def instrument_httpx() -> None:
     HTTPXClientInstrumentor().instrument()
 
 
+def instrument_httpx2() -> None:
+    from opentelemetry.instrumentation.httpx import HTTPX2ClientInstrumentor
+
+    HTTPX2ClientInstrumentor().instrument()
+
+
 def instrument_sqlalchemy(engine: "Engine") -> None:
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
