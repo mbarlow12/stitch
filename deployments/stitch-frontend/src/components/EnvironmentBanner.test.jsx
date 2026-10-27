@@ -33,8 +33,6 @@ vi.mock("./ColophonPanel", () => ({
   ),
 }));
 
-// Only `useIsFetching` is faked; the real QueryClient/Provider are still needed
-// by renderWithQueryClient.
 vi.mock("@tanstack/react-query", async (importOriginal) => ({
   ...(await importOriginal()),
   useIsFetching: vi.fn(() => 0),
@@ -125,8 +123,6 @@ describe("EnvironmentBanner", () => {
       vi.mocked(useIsFetching).mockReturnValue(1);
       await renderBanner();
 
-      // A healthy request resolves well inside the delay, so the user should
-      // never see this for a normal page load.
       act(() => vi.advanceTimersByTime(1_500));
 
       expect(screen.queryByText(WAKING_TEXT)).not.toBeInTheDocument();
@@ -145,12 +141,8 @@ describe("EnvironmentBanner", () => {
       vi.mocked(useIsFetching).mockReturnValue(1);
       const { queryClient } = await renderBanner();
 
-      // A successful query proves the container is serving, so a later stall is
-      // slow for some other reason and must not be blamed on a cold start.
       queryClient.setQueryData(["already-loaded"], { ok: true });
 
-      // useIsFetching is mocked, so the cache write does not re-render on its
-      // own; the toggle is just a cheap way to force one.
       fireEvent.click(screen.getByRole("button", { name: "Show diagnostics" }));
       act(() => vi.advanceTimersByTime(10_000));
 
@@ -164,7 +156,6 @@ describe("EnvironmentBanner", () => {
       act(() => vi.advanceTimersByTime(2_000));
       expect(screen.getByRole("status")).toBeInTheDocument();
 
-      // Fetching stops; the click is just a cheap way to force a re-render.
       vi.mocked(useIsFetching).mockReturnValue(0);
       fireEvent.click(screen.getByRole("button", { name: "Show diagnostics" }));
 

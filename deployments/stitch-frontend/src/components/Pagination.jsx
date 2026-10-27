@@ -1,18 +1,9 @@
 import { PAGE_SIZE_OPTIONS } from "../queries/resources";
 
-// Five-digit page numbers are wide enough that the usual window of nearby
-// pages overflows the control, so past this many pages the window narrows to
-// just the current page and navigation leans on the arrows (STIT-739).
 const WIDE_WINDOW_MAX_PAGES = 9999;
 const WIDE_WINDOW = 3;
 const NARROW_WINDOW = 1;
 
-// Always returns exactly `windowSize + 4` slots:
-// [first, leftEllipsis, ...window, rightEllipsis, last]
-// Near either edge the window absorbs the adjacent first/last and ellipsis
-// positions, showing a contiguous run of pages instead. `windowSize` must be
-// odd so the window can centre on the current page.
-// Each slot is { page, visible, ellipsis }
 function getSlots(currentPage, totalPages, windowSize) {
   const slot = (page, visible = true) => ({ page, visible, ellipsis: false });
   const ellipsis = (visible = true) => ({
@@ -21,7 +12,6 @@ function getSlots(currentPage, totalPages, windowSize) {
     ellipsis: true,
   });
 
-  // Length of the contiguous run of pages shown at either edge.
   const edgeRun = windowSize + 2;
   const run = (startPage) =>
     Array.from({ length: edgeRun }, (_, i) => {
@@ -29,7 +19,6 @@ function getSlots(currentPage, totalPages, windowSize) {
       return slot(page, page >= 1 && page <= totalPages);
     });
 
-  // Near the start, e.g. 1 2 3 4 5 … last for the wide window.
   if (currentPage < edgeRun) {
     return [
       ...run(1),
@@ -38,7 +27,6 @@ function getSlots(currentPage, totalPages, windowSize) {
     ];
   }
 
-  // Near the end, e.g. 1 … last-4 last-3 last-2 last-1 last for the wide window.
   if (currentPage > totalPages - edgeRun + 1) {
     return [
       slot(1, totalPages > edgeRun),
@@ -47,7 +35,6 @@ function getSlots(currentPage, totalPages, windowSize) {
     ];
   }
 
-  // Middle, e.g. 1 … prev current next … last for the wide window.
   const half = (windowSize - 1) / 2;
   return [
     slot(1),
@@ -60,18 +47,11 @@ function getSlots(currentPage, totalPages, windowSize) {
   ];
 }
 
-// `shrink-0` matters: the explicit `min-w-9` below replaces flexbox's
-// `min-width: auto`, which is what normally stops a flex item shrinking past
-// its content. Without it a narrow viewport squeezes buttons back to 36px and
-// clips the label again (STIT-739).
 const buttonBase =
   "flex h-9 shrink-0 items-center justify-center rounded-md border text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2";
 
-// The arrows hold a single glyph, so they stay square.
 const navButtonBase = `${buttonBase} w-9`;
 
-// Page buttons keep the square footprint for short numbers but grow with the
-// label rather than clipping it.
 const pageButtonBase = `${buttonBase} min-w-9 px-2 tabular-nums`;
 
 export default function Pagination({
@@ -124,7 +104,7 @@ export default function Pagination({
                 onClick={() => slot.visible && onPageChange(slot.page)}
                 aria-current={slot.page === page ? "page" : undefined}
                 style={{ visibility: slot.visible ? "visible" : "hidden" }}
-                tabIndex={slot.visible ? 0 : -1} // focusable if visible
+                tabIndex={slot.visible ? 0 : -1}
                 className={`${pageButtonBase} ${
                   slot.page === page
                     ? "border-primary bg-primary text-white"

@@ -44,7 +44,6 @@ describe("FieldCard", () => {
     const { container } = render(
       <FieldCard label="Country" value="Kuwait" source="gem" />,
     );
-    // The value box is the only element with an inline border-left style
     const valueBox = container.querySelector("[style]");
     expect(valueBox).toHaveStyle({ borderLeftColor: SOURCE_COLORS.gem });
   });
@@ -116,8 +115,6 @@ describe("FieldCard expandable behavior", () => {
   });
 
   it("rotates one marker rather than swapping glyphs", () => {
-    // Two glyphs of different optical widths nudged the layout on toggle and
-    // read as a flicker; one rotating marker shows what changed (STIT-748).
     const { rerender } = render(
       <FieldCard label="Basin" value="Foo Basin" expandable isOpen={false} />,
     );
@@ -133,15 +130,10 @@ describe("FieldCard expandable behavior", () => {
     render(
       <FieldCard label="Basin" value="Foo Basin" expandable isOpen={false} />,
     );
-    // The reported problem was a ~12px glyph whose ink read far smaller; this
-    // is a 12px box with the mark filling most of it.
     expect(screen.getByTestId("disclosure-marker")).toHaveClass("h-3", "w-3");
   });
 
   it("centres the triangle in its viewBox so it pivots about its middle", () => {
-    // A marker whose ink is off-centre swings through an arc when rotated,
-    // which is what the text glyph did. Keep the path symmetric about the
-    // viewBox centre.
     render(
       <FieldCard label="Basin" value="Foo Basin" expandable isOpen={false} />,
     );

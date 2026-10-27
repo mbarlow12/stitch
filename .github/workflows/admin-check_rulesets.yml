@@ -9,10 +9,6 @@ jobs:
   rulesets:
     name: "Check GH rulesets"
     runs-on: ubuntu-latest
-    # Explicit rather than relying on the repo/org default token permissions.
-    # NOTE: GITHUB_TOKEN has no `administration` scope; the ruleset read works
-    # with the default read grants, so contents:read is the minimal useful
-    # declaration here (checkout below).
     permissions:
       contents: read
 
@@ -20,5 +16,4 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      # Calls the centrally-maintained composite action in RMI/actions.
       - uses: RMI/actions/actions/admin/rulesets-check@main

@@ -13,8 +13,6 @@ import { usePermissions } from "../hooks/usePermissions";
 import * as apiModule from "../queries/api";
 import { AI_SUGGESTION_FIELDS } from "../constants/fieldMeta";
 
-// Mock only the read hooks; the attach path exercises the real
-// useCreateSourceForResource mutation against a spied API module.
 vi.mock("../hooks/useResources", async (importOriginal) => ({
   ...(await importOriginal()),
   useResourceDetail: vi.fn(),
@@ -51,7 +49,6 @@ const mockDetailView = {
     name_local: null,
     owners: [
       { name: "Kuwait Oil Company", stake: 100 },
-      // Providers often name a party without stating a percentage.
       { name: "Kuwait Petroleum Corporation", stake: null },
     ],
     operators: [{ name: "Kuwait Oil Company", stake: null }],
@@ -106,7 +103,6 @@ beforeEach(() => {
     isLoading: false,
     isError: false,
   });
-  // Default: permissions resolved, caller has every permission the panel checks.
   vi.mocked(usePermissions).mockReturnValue({
     data: ["service:llm:suggest", "source:write", "resource:write"],
     isLoading: false,
@@ -560,14 +556,6 @@ describe("ResourceDetailPage", () => {
 
     const { unmount } = renderWithQueryClient(<ResourceDetailPage />);
     expect(useResourceDetail).toHaveBeenCalledWith("oil-gas-fields", 1, true);
-    // Unmount before re-rendering: mockedRouteId is a shared module variable
-    // read fresh by the mocked useParams() on every render, so a still-mounted
-    // first instance would pick up the new value on any later re-render and
-    // could call useResourceDetail again — racing the second instance's call
-    // and making toHaveBeenLastCalledWith flaky. (rerender() isn't an option
-    // here: renderWithQueryClient inlines its providers into one render()
-    // call rather than using RTL's `wrapper` option, so rerender() would
-    // replace the whole wrapped tree with an unwrapped one.)
     unmount();
 
     mockedRouteId = "not-a-number";
@@ -652,8 +640,6 @@ describe("ResourceDetailPage", () => {
     expect(
       await screen.findByText("Source added to resource."),
     ).toBeInTheDocument();
-    // The attach changes the resource's coalesced data, so everything cached
-    // under the endpoint refreshes.
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["oil-gas-fields"],
     });
@@ -746,7 +732,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("holds a placeholder (no controls) while permissions are still loading", () => {
-    // Still loading: no permission data yet, so the placeholder wins.
     vi.mocked(usePermissions).mockReturnValue({ isLoading: true });
     vi.mocked(useResourceDetail).mockReturnValue({
       ...defaultHookReturn,
@@ -762,7 +747,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("hides the entire AI Suggestion panel when the user cannot run LLM suggestions", async () => {
-    // No service:llm:suggest -> the whole panel is gone (even with write perms).
     vi.mocked(usePermissions).mockReturnValue({
       data: ["source:write", "resource:write"],
       isLoading: false,
@@ -783,7 +767,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("hides the add-to-resource action when the user lacks write permissions", async () => {
-    // Can run LLM (panel shows) but has neither write permission.
     vi.mocked(usePermissions).mockReturnValue({
       data: ["service:llm:suggest"],
       isLoading: false,
@@ -812,7 +795,6 @@ describe("ResourceDetailPage", () => {
       screen.getByRole("button", { name: /generate suggestion/i }),
     );
 
-    // Suggestion still renders, but the write-gated action is not offered.
     expect(await screen.findByText("Songliao")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /add to resource/i }),
@@ -821,8 +803,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("hides the add-to-resource action when the user has only one of the two write permissions", async () => {
-    // Can run LLM + source:write granted, but resource:write missing -> action
-    // stays hidden (attach needs both).
     vi.mocked(usePermissions).mockReturnValue({
       data: ["service:llm:suggest", "source:write"],
       isLoading: false,
@@ -953,15 +933,12 @@ describe("ResourceDetailPage", () => {
       screen.getByRole("button", { name: /enrich this resource/i }),
     );
 
-    // With every request pending, every field's card shows a generating hint.
     await waitFor(() =>
       expect(screen.getAllByText(/generating suggestion…/i).length).toBe(
         AI_SUGGESTION_FIELDS.length,
       ),
     );
 
-    // Resolve just one field; its card renders while the rest still say
-    // "Generating…", proving results stream in independently.
     await act(async () => {
       deferreds.name({
         resource_id: 1,
@@ -983,9 +960,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("keeps Enrich disabled while any bulk request is still pending, not only when >1 remain", async () => {
-    // Regression test for the earlier isBulkInFlight > 1 derivation: once
-    // exactly one bulk request remains, the panel used to flip out of bulk
-    // mode and re-enable the controls.
     vi.mocked(useResourceDetail).mockReturnValue({
       ...defaultHookReturn,
       data: mockDetailView,
@@ -1064,11 +1038,9 @@ describe("ResourceDetailPage", () => {
     for (const signal of capturedSignals) {
       expect(signal.aborted).toBe(true);
     }
-    // Cancellation shouldn't render as a per-field failure.
     expect(
       screen.queryByText(/failed to generate suggestion/i),
     ).not.toBeInTheDocument();
-    // Enrich returns to its idle label and is clickable again.
     expect(
       screen.getByRole("button", { name: /enrich this resource/i }),
     ).toBeEnabled();
@@ -1093,7 +1065,6 @@ describe("ResourceDetailPage", () => {
         foundry_response: {},
       }),
     );
-    // Two deferred creates so we can hold one open while another completes.
     const createDeferreds = [];
     vi.spyOn(apiModule, "createSourceForResource").mockImplementation(
       () =>
@@ -1108,7 +1079,6 @@ describe("ResourceDetailPage", () => {
       screen.getByRole("button", { name: /enrich this resource/i }),
     );
 
-    // Wait for the bulk run to settle so every "Add to resource" is present.
     await waitFor(() =>
       expect(
         screen.getAllByRole("button", { name: /add to resource/i }).length,
@@ -1121,16 +1091,12 @@ describe("ResourceDetailPage", () => {
     await user.click(attachButtons[0]);
     await user.click(attachButtons[1]);
 
-    // Both requests are in flight and each field's own button reflects that.
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: /^adding…$/i }).length).toBe(
         2,
       ),
     );
 
-    // Resolve only the first attach; the second field must stay in "Adding…"
-    // until its own promise resolves — the bug we're guarding against would
-    // clear that indicator here.
     await act(async () => {
       createDeferreds[0]({ id: 101, source: "llm" });
     });
@@ -1148,8 +1114,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("redirects to the merged-into resource when the returned id differs from the URL", () => {
-    // STIT-418: the API resolved a merged-away id (123) to its terminal
-    // resource (456), so the page redirects to the canonical URL.
     mockedRouteId = "123";
     vi.mocked(useResourceDetail).mockReturnValue({
       ...defaultHookReturn,
@@ -1166,8 +1130,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("shows an ephemeral notice on the destination when arrived via redirect", () => {
-    // Simulates having landed on the canonical resource via the redirect above:
-    // the router carries the original id in location state.
     mockedRouteId = "456";
     mockLocationState = { redirectedFrom: 123 };
     vi.mocked(useResourceDetail).mockReturnValue({
@@ -1179,7 +1141,6 @@ describe("ResourceDetailPage", () => {
 
     expect(screen.getByText(/merged into this record/i)).toBeInTheDocument();
     expect(screen.getByText("123")).toBeInTheDocument();
-    // It's a notice, not a redirect: no further navigation.
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
@@ -1201,7 +1162,7 @@ describe("ResourceDetailPage", () => {
     mockedRouteId = "1";
     vi.mocked(useResourceDetail).mockReturnValue({
       ...defaultHookReturn,
-      data: mockDetailView, // id 1 === route id 1
+      data: mockDetailView,
     });
 
     renderWithQueryClient(<ResourceDetailPage />);
@@ -1210,7 +1171,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("does not redirect again once on the canonical resource", () => {
-    // Landed on the root: id matches the URL, so no further redirect (no loop).
     mockedRouteId = "456";
     vi.mocked(useResourceDetail).mockReturnValue({
       ...defaultHookReturn,
@@ -1239,8 +1199,6 @@ describe("ResourceDetailPage", () => {
   });
 
   it("does not loop when a string id already matches the URL", () => {
-    // A strict `!==` against the numeric URL id would treat "456" !== 456 as a
-    // mismatch and redirect forever; the numeric coercion prevents that.
     mockedRouteId = "456";
     vi.mocked(useResourceDetail).mockReturnValue({
       ...defaultHookReturn,

@@ -11,8 +11,6 @@ jobs:
       - name: Build payload
         id: payload
         run: |
-          # Build a simple JSON payload Jira automation can consume as webhookData.*
-          # We send 'summary' and 'description' directly for easy mapping.
           jq -n \
             --arg action "opened" \
             --arg repository "${{ github.repository }}" \

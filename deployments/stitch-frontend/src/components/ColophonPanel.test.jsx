@@ -696,7 +696,6 @@ describe("ColophonPanel", () => {
       fireEvent.click(menuButton);
       fireEvent.click(screen.getByRole("button", { name: "Refresh token" }));
 
-      // Past the first refresh's 2s reset, while the retry is still running.
       await act(async () => {
         vi.advanceTimersByTime(2500);
       });

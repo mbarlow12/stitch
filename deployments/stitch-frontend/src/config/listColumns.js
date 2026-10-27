@@ -1,16 +1,5 @@
-/**
- * Column definitions for the resources list table.
- *
- * These live outside the table component because two very different consumers
- * need them: the table renders them, and the URL schema (config/listParams.js)
- * validates `sort_by` against them. A component module cannot export both a
- * component and shared constants without breaking Fast Refresh, so the shared
- * data lives here instead.
- */
 import { getCountryName } from "../constants/countries";
 
-// sortType: "string" | "number", omit sortable (or set false) to disable sorting for a column.
-// format: optional (value) => displayValue applied to the cell's raw value.
 export const COLUMNS = [
   {
     label: "Name",
@@ -64,8 +53,6 @@ export const COLUMNS = [
   },
 ];
 
-// The canonical list of columns the API can sort by, used by the URL schema
-// (config/listParams.js) to validate sort_by against one source of truth.
 export const SORTABLE_COLUMN_KEYS = COLUMNS.filter((col) => col.sortable).map(
   (col) => col.key,
 );

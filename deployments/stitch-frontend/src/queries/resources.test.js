@@ -12,10 +12,6 @@ describe("resourceQueries.list", () => {
   });
 });
 
-// Mutations invalidate an entire endpoint's cache with a single-segment
-// queryKey ([endpoint]), relying on every real query key being prefixed by
-// it. This guards that invariant: break it here and invalidation silently
-// stops reaching whichever factory's key no longer starts with [endpoint].
 describe("resourceQueries key prefixes", () => {
   const endpoint = "oil-gas-fields";
   const cases = [

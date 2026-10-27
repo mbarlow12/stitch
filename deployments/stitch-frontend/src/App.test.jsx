@@ -44,9 +44,6 @@ function countryChip() {
   return screen.queryByRole("button", { name: "Remove Country: Norway" });
 }
 
-// Mirrors ResourceDetailPage's "← Back" (navigate(-1)). Rendered as a sibling of
-// <App /> so it shares the router. window.history.back() does not drive
-// MemoryRouter, so this is the way to exercise browser Back in jsdom.
 function BackButton() {
   const navigate = useNavigate();
   return <button onClick={() => navigate(-1)}>test-back</button>;
@@ -224,7 +221,6 @@ describe("App", () => {
         { initialEntries: ["/?country=NOR", "/etl"] },
       );
 
-      // Start away from the list, as if a resource had been opened.
       expect(screen.queryByTestId("filter-bar")).not.toBeInTheDocument();
 
       fireEvent.click(screen.getByText("test-back"));

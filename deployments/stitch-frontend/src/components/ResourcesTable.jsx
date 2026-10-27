@@ -21,10 +21,6 @@ function SortIndicator({ column, sortConfig }) {
   );
 }
 
-// Pointer-only extension of a row's name link, so clicking, middle-clicking or
-// right-clicking anywhere in the row reaches the resource. Hidden from
-// assistive tech and the tab order: the name cell holds the row's one real,
-// named link.
 function RowLinkOverlay({ href }) {
   return (
     <Link
@@ -57,8 +53,6 @@ export default function ResourcesTable({
   const sorted = resources;
 
   return (
-    // The spinner sits beside the horizontal scroll box, not inside it, so it
-    // does not scroll away with the columns on narrow screens.
     <div className="relative rounded-md border border-line bg-panel">
       <div className="overflow-x-auto rounded-md">
         <table
@@ -102,12 +96,6 @@ export default function ResourcesTable({
               const resourceHref = `/oil-gas-fields/${resource.id}`;
 
               return (
-                // Each cell carries its own overlay so the whole row stays
-                // clickable. The overlays are deliberately anchored to the <td>s
-                // rather than the <tr>: CSS 2.1 leaves `position: relative`
-                // undefined on table rows and WebKit ignores it, which made every
-                // row's overlay resolve against the scroll container and cover the
-                // entire table (STIT-737).
                 <tr
                   key={resource.id}
                   className="group border-b border-line/70 transition-colors hover:bg-surface"
@@ -154,9 +142,6 @@ export default function ResourcesTable({
       {isFetching && (
         <div role="status" className="absolute inset-0 flex justify-center">
           <span className="sr-only">Updating resources...</span>
-          {/* Sticks toward mid-screen but stays inside the table, so a table
-              taller than the screen never hides it. Keep the top margin small:
-              spinner plus margin must fit a one-row table, or it pokes out. */}
           <span
             aria-hidden="true"
             className="sticky top-[calc(50vh-1rem)] mt-8 h-8 w-8 animate-spin rounded-full border-2 border-line border-t-ink-muted motion-reduce:animate-none"

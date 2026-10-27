@@ -24,8 +24,6 @@ import {
 } from "../config/mergeReviewSortPreference";
 
 const ENDPOINT = "oil-gas-fields";
-// Tailwind's md breakpoint, where the queue moves beside the decision panel
-// (the md: grid classes in the page layout below).
 const TWO_COLUMN_LAYOUT_QUERY = "(min-width: 48rem)";
 
 function getStatusClasses(status) {
@@ -41,7 +39,6 @@ function getStatusClasses(status) {
   return "border-line bg-surface text-ink";
 }
 
-// PENDING reads as "CANDIDATE": it isn't a real merged resource yet.
 function getStatusLabel(status) {
   return status === "PENDING" ? "CANDIDATE" : status;
 }
@@ -56,8 +53,6 @@ function StatusBadge({ status }) {
   );
 }
 
-// Resource and merged ids aren't shown as list text, but stay one hover away
-// via the title attribute (and remain visible in the detail view facts).
 function candidateSourcesTitle(candidate) {
   const parts = [`Source resources: ${candidate.resource_ids.join(", ")}`];
   if (candidate.merged_resource_id) {
@@ -71,15 +66,10 @@ function CandidateQueueItem({ candidate, isSelected, onSelect }) {
     ENDPOINT,
     candidate.resource_ids,
   );
-  // Post-merge, the source resources are null shells, so the merged resource
-  // is the authoritative name source. The hook is disabled until an id exists,
-  // so pending candidates skip the fetch.
   const { data: mergedResource } = useMergedResourceDetail(
     ENDPOINT,
     candidate.merged_resource_id,
   );
-  // The same helper the queue's name sort uses (useCandidateDisplayNames), so
-  // the order always matches the names shown.
   const displayName = candidateDisplayName(candidate.id, {
     sourceDetails,
     mergedResource,
@@ -122,11 +112,6 @@ function QueuePanel({
   nameLoadProgress,
 }) {
   return (
-    // From md up the queue sits in the left column as a sticky, viewport-tall
-    // box whose list scrolls on its own, so scrolling the candidates never
-    // moves the decision panel beside it. It sticks 60px down (top-15) to
-    // clear the non-production EnvironmentBanner, itself sticky at the top
-    // and 46px tall when collapsed; max-h keeps a 1rem gap at the bottom.
     <aside className="min-w-0 rounded-md border border-line bg-panel md:sticky md:top-15 md:col-start-1 md:row-start-1 md:flex md:max-h-[calc(100vh-4.75rem)] md:flex-col md:self-start">
       <div className="shrink-0 border-b border-line px-4 py-3">
         <h2 className="text-base font-semibold text-ink">Queue</h2>
@@ -153,8 +138,6 @@ function QueuePanel({
             ))}
           </select>
         </label>
-        {/* Names load one candidate at a time, so until they all have, the
-            name order is incomplete: say so rather than look final. */}
         {nameLoadProgress && (
           <p role="status" className="mt-2 text-xs text-ink-muted">
             Loading names… {nameLoadProgress.loaded} of {nameLoadProgress.total}
@@ -323,21 +306,11 @@ function CandidateDecisionPanel({
   } = candidateQuery;
 
   const candidate = detailCandidate ?? listCandidate;
-  // The compare-derived name is authoritative once the detail lands. Until
-  // then the queue's name stands in — it reads the same cached query the
-  // queue items already issued, so no extra requests — because falling back
-  // to the id would flash "Candidate #N" on first selection.
   const queueName = useMergeCandidateName(ENDPOINT, candidate?.resource_ids);
-  // The source resources' detail views, for the per-column source mix in the
-  // comparison. Same cache entry the name lookup above reads, so no extra
-  // requests.
   const sourceDetails = useMergeSourceDetails(
     ENDPOINT,
     candidate?.resource_ids,
   );
-  // Post-merge, the source resources are null shells and compare carries no
-  // name, so the merged resource is the authoritative source. It shares the
-  // cache entry MergedResourceView fetches, so this adds no requests.
   const { data: mergedResource } = useMergedResourceDetail(
     ENDPOINT,
     candidate?.merged_resource_id,
@@ -357,9 +330,6 @@ function CandidateDecisionPanel({
     );
   }
 
-  // A detail error only blocks when there is nothing to show. When the queue
-  // item is present it carries every field the panel renders, so the panel
-  // degrades to a banner rather than disappearing.
   if (candidateError && !candidate) {
     return (
       <section className="rounded-md border border-line bg-panel p-5">
@@ -456,7 +426,6 @@ export default function MergeCandidateReviewPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [showApproved, setShowApproved] = useState(false);
-  // Remembered for the browser session, so leaving and returning keeps it.
   const [sort, setSort] = useState(getRememberedMergeReviewSort);
   const selectedPanelRef = useRef(null);
 
@@ -476,16 +445,10 @@ export default function MergeCandidateReviewPage() {
     error: listErrorObj,
   } = useMergeCandidates(ENDPOINT, true);
 
-  // Approved merges are finished work, so the queue hides them unless the
-  // reviewer opts in. Filtering here rather than in the API keeps the header
-  // counts below reporting on the whole workload, not just the visible rows.
   const filteredCandidates = candidates?.filter(
     (c) => showApproved || c.status !== "APPROVED",
   );
 
-  // Names come from the queue items' own cached lookups (no extra requests).
-  // Until every visible candidate's name has loaded, a name sort is
-  // incomplete, so the queue says so.
   const isNameSort = sort === "name-asc" || sort === "name-desc";
   const { namesById, loadedCount, total } = useCandidateDisplayNames(
     ENDPOINT,
@@ -502,11 +465,6 @@ export default function MergeCandidateReviewPage() {
     rememberMergeReviewSort(nextSort);
   }
 
-  // Default to the first pending candidate once the list loads. Done during
-  // render (not in an effect) so the selection is set before the first paint
-  // and without triggering a cascading re-render. Chosen from the visible
-  // rows, in the chosen sort order, so the selection can never land on a
-  // filtered-out candidate.
   if (!selectedId && visibleCandidates?.length) {
     const firstPending = visibleCandidates.find((c) => c.status === "PENDING");
     setSelectedId(firstPending?.id ?? visibleCandidates[0].id);
@@ -517,10 +475,6 @@ export default function MergeCandidateReviewPage() {
     selectedId,
     Boolean(selectedId),
   );
-  // The detail endpoint layers `compare` on top of the list schema, so the
-  // already-loaded queue item stands in for everything except the comparison
-  // until the detail query lands. Without this, review actions dead-click
-  // while the detail is in flight.
   const listCandidate =
     candidates?.find((item) => item.id === selectedId) ?? null;
   const candidate = candidateQuery.data ?? listCandidate;
@@ -533,19 +487,12 @@ export default function MergeCandidateReviewPage() {
 
   function handleSelect(id) {
     setSelectedId(id);
-    // The panel precedes the queue in the DOM (see the layout below), so move
-    // focus to it: the next Tab then reaches the chosen candidate's decision
-    // controls. Focusing must not scroll by itself -- the panel is taller than
-    // the screen, so the browser would jump the page on every click. Scroll
-    // only in the one-column layout, where the panel sits above the queue and
-    // would otherwise change off-screen.
     const panel = selectedPanelRef.current;
     panel?.focus({ preventScroll: true });
     if (!window.matchMedia(TWO_COLUMN_LAYOUT_QUERY).matches) {
       panel?.scrollIntoView({ block: "start" });
     }
     setReviewNotes("");
-    // Clear any error left over from reviewing the previous candidate.
     reviewMutation.reset();
   }
 
@@ -555,11 +502,7 @@ export default function MergeCandidateReviewPage() {
     reviewMutation.mutate(
       { id: candidate.id, action, reviewNotes },
       {
-        // Runs after the mutation's cache invalidation, so the queue advances
-        // once the refreshed data is on its way. Failures surface via
-        // `reviewMutation.error` and keep the current candidate selected.
         onSuccess: () => {
-          // Continue through the queue as displayed, in the chosen sort.
           const nextPending = visibleCandidates?.find(
             (item) => item.id !== candidate.id && item.status === "PENDING",
           );
@@ -607,11 +550,6 @@ export default function MergeCandidateReviewPage() {
         </div>
       </header>
 
-      {/* The panel comes first in the DOM so one-column screens show the
-          candidate above the queue, and screen readers and keyboard focus
-          follow the same order. From md up, grid placement moves the queue
-          into the left column; handleSelect keeps keyboard flow working by
-          moving focus to the panel. */}
       <div className="grid gap-6 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[20rem_minmax(0,1fr)]">
         <div
           ref={selectedPanelRef}

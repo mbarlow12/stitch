@@ -22,7 +22,6 @@ function renderPagination(props) {
   );
 }
 
-// Page buttons, in render order, excluding the prev/next arrows.
 function pageButtons(container) {
   return [...container.querySelectorAll("button")].filter(
     (button) => !button.getAttribute("aria-label"),
@@ -127,7 +126,6 @@ describe("Pagination", () => {
     });
   });
 
-  // STIT-739
   describe("large page counts", () => {
     it("formats page numbers with locale-aware thousands separators", () => {
       const { container } = renderPagination({
@@ -217,14 +215,11 @@ describe("Pagination", () => {
         expect(button.className).toMatch(/(^|\s)min-w-9(\s|$)/);
       }
 
-      // The arrows carry a single glyph and stay square.
       expect(screen.getByLabelText("Next page").className).toMatch(
         /(^|\s)w-9(\s|$)/,
       );
     });
 
-    // `min-w-9` replaces flexbox's `min-width: auto`, so without `shrink-0` a
-    // narrow viewport squeezes the buttons back to 36px and clips the label.
     it("stops buttons being squeezed below their label, wrapping instead", () => {
       const { container } = renderPagination({
         page: 5000,

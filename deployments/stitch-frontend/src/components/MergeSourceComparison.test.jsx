@@ -16,9 +16,6 @@ function val(resourceId, value, priority) {
   };
 }
 
-// Statuses come verbatim from the backend; the component must not re-derive
-// them. "country" encodes the deliberate semantics change: case-different
-// strings are now "different".
 const compare = [
   {
     field: "name",
@@ -79,7 +76,6 @@ describe("MergeSourceComparison", () => {
     expect(screen.getByText("Region")).toBeInTheDocument();
     expect(screen.getByText("Basin")).toBeInTheDocument();
     expect(screen.getByText("State / Province")).toBeInTheDocument();
-    // 5 core fields x 2 sources
     expect(screen.getAllByTestId("comparison-skeleton-cell")).toHaveLength(10);
     expect(screen.getByText("Loading comparison…")).toBeInTheDocument();
   });
@@ -130,7 +126,6 @@ describe("MergeSourceComparison", () => {
     const row = screen.getByRole("group", { name: "Name" });
     expect(within(row).getAllByText("Match")).toHaveLength(2);
     expect(within(row).queryByText("No value")).not.toBeInTheDocument();
-    // Nothing visible to print, so the dash is display-only.
     expect(within(row).getAllByText("—")).toHaveLength(2);
   });
 
@@ -194,9 +189,6 @@ describe("MergeSourceComparison", () => {
 });
 
 describe("source mix per resource column", () => {
-  // Detail views arrive in resourceIds order (one Promise.all), each with the
-  // resource's per-field provenance -- the same data the Resource List's
-  // "Data source mix" column uses.
   const sourceDetails = {
     data: [
       { provenance: { name: "gem", country: "gem", basin: "wm" } },
@@ -214,8 +206,6 @@ describe("source mix per resource column", () => {
     renderComparison({ sourceDetails });
 
     const [first, second] = columnMixes();
-    // Sources are listed in the app's fixed source order, as on the Resource
-    // List, not by count.
     expect(first).toHaveAccessibleName(
       "Data source mix: Woodmac: 1 field (33%); GEM: 2 fields (67%)",
     );
@@ -260,10 +250,6 @@ describe("source mix per resource column", () => {
   });
 
   it("shows cached source mixes even while the comparison itself loads", () => {
-    // The queue loads these details for candidate names, so they are usually
-    // cached before the comparison arrives. Showing them early costs no
-    // layout shift (the placeholder is the same height). The loading layout
-    // is hidden from screen readers, hence { hidden: true }.
     renderComparison({ compare: undefined, isLoading: true, sourceDetails });
 
     expect(
@@ -280,7 +266,6 @@ describe("source mix per resource column", () => {
     });
 
     expect(screen.getAllByText("Source mix unavailable")).toHaveLength(2);
-    // Not the misleading "No source data", which means the resource has none.
     expect(screen.queryByText("No source data")).not.toBeInTheDocument();
   });
 

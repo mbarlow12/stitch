@@ -18,15 +18,8 @@ import {
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === "true";
 const MOCK_RESOURCE_ITEMS = mockResources.map(normalizeResourceListItem);
 
-// Mock hooks never call the real API, but still need the exact queryKey a
-// real hook would use (so cache invalidation reaches them too). Building
-// that key means calling the real resourceQueries factory; the config it
-// closes over is never read, since queryFn is always overridden below.
 const UNUSED_MOCK_CONFIG = {};
 
-//--------------------------------
-// Real Implementations
-//--------------------------------
 function useResourcesReal(
   endpoint = "resources",
   {
@@ -124,9 +117,6 @@ function useMergeCandidateReal(
   });
 }
 
-//--------------------------------
-// Mock Implementations
-//--------------------------------
 function applyMockFilters(resources, filters = {}) {
   return resources.filter((resource) =>
     Object.entries(filters).every(([field, selected]) => {
@@ -313,9 +303,6 @@ function useFieldSourceValuesMock(
   field,
   enabled = true,
 ) {
-  // Mock mode has no backend; the panel degrades to an empty state, matching
-  // useSourceDetailMock. Real behavior is exercised against the API. Guard `id`
-  // the same way the real hook does so the query key stays stable.
   return useQuery({
     ...resourceQueries.fieldSources(UNUSED_MOCK_CONFIG, endpoint, id, field),
     queryFn: () => Promise.resolve([]),
@@ -343,25 +330,12 @@ function useMergeCandidateMock(
   });
 }
 
-//--------------------------------
-// Mutations
-//--------------------------------
-// Mutations always hit the real API (mock mode hides the write affordances
-// behind permissions), so there are no mock variants. Each one invalidates
-// every cached query under the endpoint on success — lists, details, views,
-// field-sources, filter-options, and merge-candidates all share the
-// `[endpoint]` key prefix — so any save refreshes whatever is on screen.
-
 export function useCreateSourceForResource(endpoint = "oil-gas-fields") {
   const config = useConfig();
   const queryClient = useQueryClient();
   return useAuthenticatedMutation({
     mutationFn: (fetcher, { resourceId, payload }) =>
       createSourceForResource(config, resourceId, payload, fetcher, endpoint),
-    // Every resourceQueries key is prefixed by [endpoint] (enforced by
-    // resources.test.js), so this one-segment key invalidates everything
-    // cached for the endpoint — lists, details, views, field-sources,
-    // filter-options, and merge-candidates.
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [endpoint] }),
   });
 }
@@ -376,7 +350,6 @@ export function useReviewMergeCandidate(endpoint = "oil-gas-fields") {
   });
 }
 
-// Export one implementation based on the compile-time flag. Assign at module level
 export const useResources = USE_MOCK_DATA ? useResourcesMock : useResourcesReal;
 export const useResourceFilterOptions = USE_MOCK_DATA
   ? useResourceFilterOptionsMock

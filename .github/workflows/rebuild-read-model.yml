@@ -1,13 +1,4 @@
 ---
-# Rebuild the API's resource-state read model: recompute every listable
-# resource's precomputed rows from the authoritative tables. The API's write
-# paths keep those rows current; this repairs anything they missed and picks up
-# changes to how answers are computed. Safe while the API serves traffic.
-# Runs the given API image, so the rows are computed by that code. The database
-# host, port, and sslmode come from the lane's GitHub Environment (as in
-# deploy-db.yml), so callers only name the database.
-#
-# See deployments/api/READ_MODEL.md.
 on:
   workflow_call:
     inputs:
@@ -60,11 +51,9 @@ jobs:
           POSTGRES_HOST: ${{ vars.POSTGRES_HOST }}
           POSTGRES_PORT: ${{ vars.POSTGRES_PORT || '5432' }}
           POSTGRES_DB: ${{ inputs.postgres-db }}
-          # Reads and rewrites rows only, so the app's own role is enough.
           POSTGRES_USER: stitch_app
           POSTGRES_PASSWORD: ${{ secrets.stitch-app-password }}
           PGSSLMODE: ${{ vars.POSTGRES_SSLMODE || 'require' }}
-          # A batch job: don't instrument every query for tracing.
           OTEL_TRACES_EXPORTER: none
         run: |
           set -euo pipefail

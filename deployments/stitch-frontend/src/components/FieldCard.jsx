@@ -6,11 +6,6 @@ import {
   DEFAULT_FIELD_COLOR,
 } from "../constants/sourceMeta";
 
-// Used to display a single field value in a card, as seen in the ResourceDetailPage.
-// Pass `source` (one of "gem" | "wm" | "ccr" | "bc" | "alb" | "nor" | "rmi" | "llm") to tint the left border by data source.
-// Pass `expandable` + `isOpen` + `onToggle` to make the value a toggle button; `children`
-// (e.g. an "All sources" panel) render below the box while open. The card is presentational:
-// the parent owns open state and any data fetching.
 export function FieldCard({
   label,
   value,
@@ -38,11 +33,6 @@ export function FieldCard({
           {display ?? <span className="text-ink-muted">—</span>}
         </div>
         {expandable && (
-          // Drawn rather than typed: the ▸ glyph's ink sits off-centre inside
-          // its character box, so rotating the text pivoted the mark about a
-          // point that wasn't its middle — and where the ink lands varies by
-          // font. An explicit triangle, centred in its own viewBox, turns about
-          // its true centre on every platform.
           <svg
             aria-hidden="true"
             focusable="false"
@@ -81,7 +71,6 @@ export function FieldCard({
         <button
           type="button"
           aria-expanded={isOpen}
-          // Only reference the panel while it is mounted (rendered on open).
           aria-controls={isOpen ? panelId : undefined}
           onClick={onToggle}
           className={`${boxClasses} transition-colors hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1`}

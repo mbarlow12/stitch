@@ -115,7 +115,6 @@ describe("read-hook enabled defaults", () => {
 
     renderHook(() => useResource("oil-gas-fields", null), { wrapper });
 
-    // Give any wrongly-scheduled fetch a chance to fire before asserting.
     await act(async () => {});
     expect(getResourceSpy).not.toHaveBeenCalled();
   });

@@ -7,10 +7,6 @@ import {
 import { compareEntry, valueEntryForResource } from "../utils/candidateCompare";
 import SourceMixBar from "./SourceMixBar";
 
-// Color is never the only signal: each status pairs its strip color with an
-// icon (aria-hidden) and a text label. "match"/"different" mirror the backend
-// status values; "empty" is local to the UI for cells and rows where no
-// source has a value.
 const STATUS_META = {
   match: {
     borderClass: "border-l-success",
@@ -32,8 +28,6 @@ const STATUS_META = {
   },
 };
 
-// Shared by ComparisonCell and ComparisonSkeletonCell so the loading grid and
-// the loaded grid cannot drift apart in size.
 const CELL_BOX_CLASSES =
   "min-w-0 rounded-md border border-line border-l-4 bg-panel px-3 py-2";
 
@@ -41,10 +35,6 @@ function gridColumnsStyle(count) {
   return { gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` };
 }
 
-// The backend omits null values entirely, so a missing valueEntry means the
-// resource has no value ("empty" status). An empty string is a real value
-// with a real status; it just has nothing visible to print, so the dash for
-// it is display-only.
 function ComparisonCell({ valueEntry, status }) {
   const meta = STATUS_META[status];
   const value = valueEntry?.value;
@@ -97,11 +87,6 @@ function ComparisonRow({ fieldKey, entry, resourceIds }) {
   );
 }
 
-// A loading cell keeps the empty cell's box and neutral left edge, with a
-// spinner where the value will land. The value row is pinned to h-5 — the
-// text-sm line height of a loaded value — and the status cue is reserved but
-// blank, so the cell is exactly the height of a loaded one. The cue stays blank
-// on purpose: a loading cell has no status yet, and "No value" would be false.
 function ComparisonSkeletonCell() {
   return (
     <div
@@ -116,11 +101,6 @@ function ComparisonSkeletonCell() {
   );
 }
 
-// Which data sources a resource's values come from, under its column heading:
-// the same compact bar the Resource List's "Data source mix" column shows.
-// `sourceDetails` is the caller's query of the resources' detail views, in
-// resourceIds order; without it nothing is shown. While it loads, a grey bar
-// the same height as the loaded one keeps the rows below from shifting.
 function ColumnSourceMix({ sourceDetails, index }) {
   if (!sourceDetails) return null;
 
@@ -152,7 +132,6 @@ function ColumnSourceMix({ sourceDetails, index }) {
   );
 }
 
-// One column heading: the resource id, then its source mix.
 function ColumnHeader({ resourceId, sourceDetails, index }) {
   return (
     <div className="min-w-0">
@@ -164,12 +143,6 @@ function ColumnHeader({ resourceId, sourceDetails, index }) {
   );
 }
 
-// The loaded layout with placeholders in the cells. Headers and field labels are
-// real: resourceIds is a prop and FIELD_META is static, so neither changes when
-// the data lands. The trailing bar stands in for the collapsed accordion summary.
-// Source mixes are real too once their own query has data -- usually already,
-// since the queue loads it for candidate names -- and the placeholder is the
-// same height, so showing them early causes no layout shift.
 function ComparisonSkeleton({ resourceIds, sourceDetails }) {
   return (
     <div aria-hidden="true" className="space-y-4">
@@ -237,12 +210,6 @@ function OtherAttributesAccordion({ compare, resourceIds }) {
   );
 }
 
-// Read-only, side-by-side comparison of a merge candidate's source resources,
-// rendered from the backend `compare` object on the candidate detail response.
-// Statuses come verbatim from the backend; this component performs no value
-// comparison of its own. Loading and error state belong to the caller's
-// detail query, and the per-column source mix to the caller's
-// `sourceDetails` query.
 export default function MergeSourceComparison({
   resourceIds,
   compare,

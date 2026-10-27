@@ -1,12 +1,10 @@
 UV ?= uv
 DOCKER_COMPOSE := docker compose -f docker-compose.yml
 DOCKER_COMPOSE_DEV := $(DOCKER_COMPOSE) -f docker-compose.local.yml
-# Adds the OpenTelemetry collector + Jaeger sidecars (the "heavy" stack).
 DOCKER_COMPOSE_OTEL := $(DOCKER_COMPOSE_DEV) -f docker-compose.otel.yml
 PYTEST := $(UV) run pytest
 RUFF := $(UV) run ruff
 
-# ---- Build metadata ---------------------------------------------------------
 
 GIT_SHA        := $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 GIT_SHORT_SHA  := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -15,7 +13,6 @@ BUILD_ID       := local-$(GIT_SHORT_SHA)
 
 API_APP_VERSION := $(shell grep '^version' deployments/api/pyproject.toml | sed 's/.*"\(.*\)".*/\1/' || echo unknown)
 FRONTEND_APP_VERSION := $(shell node -p "require('./deployments/stitch-frontend/package.json').version" 2>/dev/null || echo unknown)
-# Aggregate check: can be run in parallel with -j
 check: lint test format-check lock-check
 	@echo "All checks passed."
 
@@ -32,9 +29,6 @@ build-all: py-build frontend-build
 clean-build:
 	rm -rf build dist
 
-# ---------------------------------------------------------------------
-# Python (UV) infrastructure
-# ---------------------------------------------------------------------
 
 uv-dev: uv-sync-dev
 uv-sync-dev:
@@ -67,16 +61,12 @@ py-build: api-build stitch-llm-build pkg-build
 uv-sync:
 	$(UV) sync
 
-# Generic helpers
 uv-test-target:
 	$(UV) run --package $(PKG) --active pytest $(TEST_PATH) $(ARGS)
 
 uv-test-target-exact:
 	$(UV) run --package $(PKG) --active --exact --group dev pytest $(TEST_PATH) $(ARGS)
 
-# ---------------------------------------------------------------------
-# UV Packages
-# ---------------------------------------------------------------------
 
 pkg-build-auth:
 	$(UV) build --package stitch-auth
@@ -117,9 +107,6 @@ pkg-build: pkg-build-auth pkg-build-client pkg-build-models pkg-build-ogsi pkg-b
 pkg-test: pkg-test-auth pkg-test-client pkg-test-models pkg-test-ogsi pkg-test-observability
 pkg-test-exact: pkg-test-exact-auth pkg-test-exact-client pkg-test-exact-models pkg-test-exact-ogsi pkg-test-exact-observability
 
-# ---------------------------------------------------------------------
-# Deployments
-# ---------------------------------------------------------------------
 
 api-build:
 	$(UV) build --package stitch-api
@@ -176,9 +163,6 @@ seed-test:
 seed-test-exact:
 	$(MAKE) uv-test-target-exact PKG=stitch-seed TEST_PATH=deployments/seed
 
-# ---------------------------------------------------------------------
-# stitch-frontend
-# ---------------------------------------------------------------------
 FRONTEND_DIR := deployments/stitch-frontend
 NPM := npm --prefix $(FRONTEND_DIR)
 
@@ -188,7 +172,6 @@ FRONTEND_LOCK := $(FRONTEND_DIR)/package-lock.json
 FRONTEND_INSTALL_STAMP := build/frontend.npm-ci.stamp
 FRONTEND_BUILD_STAMP   := build/frontend.build.stamp
 
-# Inputs that should trigger reinstall / rebuild
 FRONTEND_INSTALL_INPUTS := $(FRONTEND_PKG) $(FRONTEND_LOCK)
 
 FRONTEND_BUILD_INPUTS := \
@@ -218,7 +201,6 @@ stack-frontend-dev:
 		up --build \
 		-d
 
-# --- install deps (keyed off lockfile) ---
 frontend-install: $(FRONTEND_INSTALL_STAMP)
 
 $(FRONTEND_INSTALL_STAMP): $(FRONTEND_INSTALL_INPUTS)
@@ -226,7 +208,6 @@ $(FRONTEND_INSTALL_STAMP): $(FRONTEND_INSTALL_INPUTS)
 	$(NPM) ci
 	touch $@
 
-# --- build (incremental) ---
 frontend-build: $(FRONTEND_BUILD_STAMP)
 
 $(FRONTEND_BUILD_STAMP): $(FRONTEND_INSTALL_STAMP) $(FRONTEND_BUILD_INPUTS)
@@ -250,9 +231,6 @@ frontend-clean:
 	rm -rf $(FRONTEND_DIR)/dist $(FRONTEND_DIR)/node_modules \
 	       $(FRONTEND_INSTALL_STAMP) $(FRONTEND_BUILD_STAMP)
 
-# ---------------------------------------------------------------------
-# Docker
-# ---------------------------------------------------------------------
 clean-docker:
 	$(DOCKER_COMPOSE_DEV) --profile "*" down --volumes --remove-orphans
 
@@ -262,28 +240,21 @@ dev-docker:
 reboot-docker: clean-docker
 	$(DOCKER_COMPOSE_DEV) --profile full up --build
 
-# Like reboot-docker, but also brings up the OTel collector + Jaeger. The otel
-# compose file overrides the API to otlp export, so the default `console` path
-# (and a collector-free `make reboot-docker`) is never aimed at an absent
-# collector. Jaeger UI: http://localhost:16686
 reboot-docker-heavy: clean-docker
 	$(DOCKER_COMPOSE_OTEL) --profile full up --build
 
 follow-stack-logs:
 	$(DOCKER_COMPOSE_DEV) --profile full logs -f
 
-# Workspace
 .PHONY: check lint test format format-check lock-check
 .PHONY: build-all
 .PHONY: clean clean-build
 
-# Python (uv)
 .PHONY: py-lint py-test py-test-exact py-format py-format-check py-lock-check py-clean-cache
 .PHONY: py-build py-deployment-test py-deployment-test-exact
 .PHONY: uv-dev uv-sync uv-sync-dev
 .PHONY: uv-test-target uv-test-target-exact
 
-# Packages
 .PHONY: pkg-build pkg-test pkg-test-exact
 .PHONY: pkg-build-auth pkg-test-auth pkg-test-exact-auth
 .PHONY: pkg-build-client pkg-test-client pkg-test-exact-client
@@ -291,17 +262,14 @@ follow-stack-logs:
 .PHONY: pkg-build-ogsi pkg-test-ogsi pkg-test-exact-ogsi
 .PHONY: pkg-build-observability pkg-test-observability pkg-test-exact-observability
 
-# API
 .PHONY: api-build api-test api-test-exact api-dev stack-api-dev
 .PHONY: alembic-autogenerate alembic-check
 .PHONY: seed-test seed-test-exact
 .PHONY: stitch-llm-build stitch-llm-test stitch-llm-test-exact
 
-# Frontend
 .PHONY: frontend frontend-install frontend-build frontend-test frontend-lint
 .PHONY: frontend-format frontend-format-check
 .PHONY: frontend-dev frontend-clean
 
-# Docker
 .PHONY: clean-docker dev-docker reboot-docker reboot-docker-heavy
 .PHONY: stack-frontend-dev follow-stack-logs

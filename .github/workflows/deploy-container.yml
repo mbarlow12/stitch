@@ -123,20 +123,11 @@ jobs:
           : "${AZURE_RESOURCE_GROUP:?Missing required variable AZURE_RESOURCE_GROUP}"
           : "${AZURE_CONTAINER_APP_ENVIRONMENT:?Missing required variable AZURE_CONTAINER_APP_ENVIRONMENT}"
 
-          # If a registry server is configured (e.g. for private/internal GHCR
-          # images), the pull credentials must accompany it. Fail fast with a
-          # clear message rather than letting `az containerapp up` return an
-          # opaque "UNAUTHORIZED: authentication required".
           if [ -n "${REGISTRY_SERVER:-}" ]; then
             : "${REGISTRY_USERNAME:?registry-server is set but the registry-username variable is empty}"
             : "${REGISTRY_PASSWORD:?registry-server is set but the registry-password secret is empty}"
           fi
 
-          # storage-name and storage-mount-path must be set together. Callers that
-          # need durable storage (the ETL apps) hardcode the mount path, so an
-          # empty storage-name means a missing/typo'd ETL_STORAGE_NAME variable.
-          # Without this check the mount step below silently skips and the app
-          # deploys with no durable storage. Fail fast on either-without-the-other.
           if [ -n "${STORAGE_NAME:-}" ] && [ -z "${MOUNT_PATH:-}" ]; then
             echo "::error::storage-name is set but storage-mount-path is empty" >&2
             exit 1
@@ -146,10 +137,6 @@ jobs:
             exit 1
           fi
 
-          # Container Apps requires cpu and memory to be set together, and on the
-          # Consumption profile only fixed pairs are valid (memory Gi = 2x cpu, so
-          # 4.0Gi pairs with 2.0). Fail fast on one-without-the-other rather than
-          # letting `az containerapp update` reject it later.
           if [ -n "${CPU:-}" ] && [ -z "${MEMORY:-}" ]; then
             echo "::error::cpu is set but memory is empty (Container Apps requires both together)" >&2
             exit 1
@@ -196,14 +183,6 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Build and deploy Container App
-        # Pinned to v1 deliberately. v2 chooses the env-var flag from an
-        # ingress/credentials heuristic instead of from whether the app exists:
-        # creating a NEW app without registry credentials makes it emit the
-        # update-only `--replace-env-vars` flag on `az containerapp create`,
-        # which fails with "unrecognized arguments". This breaks every first
-        # (create) deploy of a per-PR preview app (e.g. the API). v1 keys the
-        # flag on app existence and is correct. No fixed v2.x point release
-        # exists yet -- revisit when Azure/container-apps-deploy-action ships one.
         uses: azure/container-apps-deploy-action@v1
         with:
           imageToDeploy: ${{ inputs.full-image-name }}
@@ -213,18 +192,11 @@ jobs:
           targetPort: ${{ inputs.target-port }}
           environmentVariables: ${{ steps.envvars.outputs.environment-variables }}
           ingress: "external"
-          # Registry pull credentials are only configured when registry-server is
-          # set (e.g. for cross-repo private/internal GHCR images). Existing
-          # callers omit these and the action leaves registry config untouched.
           registryUrl: ${{ inputs.registry-server }}
           registryUsername: ${{ inputs.registry-username }}
           registryPassword: ${{ secrets.registry-password }}
 
       - name: Reassert resources and replica scaling
-        # `az containerapp up` (the deploy action) does not reliably preserve
-        # resource (cpu/memory) or scale settings, so reassert them after every
-        # deploy when requested. Single-job apps (the ETLs) pass min=max=1 to
-        # avoid multiple replicas; memory-heavy apps pass cpu/memory.
         if: ${{ inputs.min-replicas != '' || inputs.max-replicas != '' || inputs.cpu != '' || inputs.memory != '' }}
         shell: bash
         env:
@@ -246,11 +218,6 @@ jobs:
             "${args[@]}"
 
       - name: Mount Azure Files volume
-        # The deploy action cannot mount volumes, so attach the (already
-        # environment-registered) Azure Files storage afterward by reading the
-        # current app spec, injecting a volume + volumeMount, and re-applying.
-        # show -> mutate -> update --yaml is the documented pattern and preserves
-        # everything the action just set (image, env vars, scale, registry).
         if: ${{ inputs.storage-name != '' }}
         shell: bash
         env:
@@ -284,28 +251,6 @@ jobs:
             --yaml /tmp/app.yaml
 
       - name: Widen the scale-to-zero cooldown
-        # How long an app stays up after its last request before scaling to
-        # zero. Azure's default is 300s, so a five-minute pause costs a cold
-        # start. 900s covers the ordinary gaps inside a working session --
-        # reading code, writing a comment, a short interruption -- while still
-        # dropping to zero when someone stops for the day.
-        #
-        # There is no `--cooldown-period` flag on `az containerapp update`, so
-        # this uses the same show -> mutate -> update --yaml round-trip as the
-        # volume mount above.
-        #
-        # Skipped for always-on apps: an app that never scales to zero has no
-        # use for a cooldown.
-        #
-        # `continue-on-error` because this is a comfort setting, not a
-        # correctness one, and for `api` and `stitch-llm` on a scale-to-zero
-        # lane it is the only post-deploy ARM write -- the reassert step above
-        # is skipped when no cpu/memory/replica overrides are passed. The deploy
-        # action has just created a revision, so this can lose a race and get a
-        # 409 while that is still provisioning. Failing the job over it would
-        # cascade: every later service and the frontend deploy depend on this
-        # one, so a PR would lose its whole preview environment over a cooldown
-        # tweak. A failed step stays visible in the run summary.
         if: ${{ inputs.min-replicas == '' }}
         continue-on-error: true
         shell: bash
@@ -320,9 +265,6 @@ jobs:
             --resource-group "${AZURE_RESOURCE_GROUP}" \
             --output json > /tmp/app-cooldown.json
 
-          # Read before writing: the value survives a redeploy, so on most runs
-          # it is already correct and the write would be a no-op that can still
-          # fail. Only pay for the round-trip when it actually changes something.
           current="$(jq -r \
             '.properties.template.scale.cooldownPeriod // "unset"' \
             /tmp/app-cooldown.json)"

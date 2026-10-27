@@ -30,8 +30,6 @@ const mockResources = [
   },
 ];
 
-// Several rows are required to cover row-to-row link bleed (STIT-737); a
-// single-row table cannot express that class of bug.
 const multipleMockResources = [
   ...mockResources,
   {
@@ -112,7 +110,6 @@ describe("ResourcesTable", () => {
       isFetching: true,
     });
 
-    // The previous data stays on screen rather than being replaced.
     expect(screen.getByText("Burgan Field")).toBeInTheDocument();
 
     const table = screen.getByRole("table");
@@ -124,9 +121,6 @@ describe("ResourcesTable", () => {
   });
 
   it("keeps the spinner outside the horizontally scrolling area", () => {
-    // On narrow screens the table scrolls sideways. A spinner inside that
-    // scroll box scrolls away with the columns, so it must sit beside it.
-    // (Its vertical stickiness needs a real layout engine; jsdom has none.)
     renderTable({
       resources: mockResources,
       sortConfig,
@@ -155,12 +149,6 @@ describe("ResourcesTable", () => {
       }
     });
 
-    // Regression guard for STIT-737. The row-wide click target used to be a
-    // single overlay anchored to `position: relative` on the <tr>, which CSS
-    // 2.1 leaves undefined for table rows and WebKit ignores. Every row's
-    // overlay then resolved against the scroll container and covered the whole
-    // table, so in Safari all rows led to the last resource. Anchoring each
-    // overlay to its own cell keeps the containing block inside the row.
     it("keeps every row's click target inside that row", () => {
       const { container } = renderTable({
         resources: multipleMockResources,

@@ -1,42 +1,3 @@
-/**
- * URL schema for the resources list view.
- *
- * The query string is a complete serialization of the list view: filters, sort,
- * search, and pagination. Loading a URL reproduces the same view for any user,
- * so these param names are a stable contract — see the "List view URLs" section
- * of the frontend README before changing them.
- *
- * The schema deliberately mirrors what `queries/api.js` sends to the API, so
- * there is no translation layer to keep in sync.
- *
- * The functions here are pure. The module imports its allowlists rather than
- * restating them, so adding a sortable column or a page size cannot drift the
- * URL schema. Those live in non-component modules (config/listColumns.js,
- * queries/resources.js) so no file has to export both a component and shared
- * constants — doing so breaks Fast Refresh.
- *
- * Rules:
- * - Defaults are omitted, so the default view is a bare `/`.
- * - Serialization order is fixed, so the same view always produces the same URL.
- * - Junk in the params this module owns is tolerated, never fatal: page,
- *   page_size, sort_by and sort_order all fall back to their defaults.
- * - Filter values are passed through unvalidated, because the set of valid
- *   values is server-side data this module cannot see. An unknown value for a
- *   free-text filter (country, region, state_province, basin) simply matches
- *   nothing; for the enum-backed ones (field_status,
- *   primary_hydrocarbon_group) the API rejects it with a 422, so a
- *   hand-edited URL can surface an error rather than an empty list.
- * - Params we do not own are ignored on read and dropped on the next write.
- * - Page size alone has a second fallback: the size the user chose earlier in
- *   the session (config/pageSizePreference.js), passed in as
- *   `fallbackPageSize`. It applies only when the URL has no valid
- *   `page_size`, so a URL always wins. Because a URL without `page_size`
- *   therefore opens at the *viewer's* remembered size, `page_size` is written
- *   into every URL that carries any other state (a page, search, sort or
- *   filter) -- page=3 at 50 per page is different rows from page=3 at 10.
- *   It is omitted only from an otherwise bare URL whose size matches the
- *   fallback, so a bare "/" means "the list at my page size".
- */
 import { FILTER_FIELDS } from "./filters";
 import { SORTABLE_COLUMN_KEYS } from "./listColumns";
 import {
@@ -61,8 +22,6 @@ function parsePageSize(raw, fallbackPageSize) {
   return PAGE_SIZE_OPTIONS.includes(value) ? value : fallbackPageSize;
 }
 
-// sort_by and sort_order are a unit: a lone order has no meaning, and an
-// unsortable column would 422 at the API, so both are dropped together.
 function parseSort(rawSortBy, rawSortOrder) {
   if (!SORTABLE_COLUMN_KEYS.includes(rawSortBy)) {
     return { sortBy: null, sortOrder: DEFAULT_SORT_ORDER };

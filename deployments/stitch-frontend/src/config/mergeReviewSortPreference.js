@@ -1,13 +1,3 @@
-/**
- * The Merge Review queue's sort, remembered for the rest of the browser
- * session (session storage is per tab and cleared when it closes), the same
- * way the Resource List remembers its page size (config/pageSizePreference.js).
- *
- * Storage can be unavailable (some privacy modes throw on every access), so
- * both functions treat any storage error as "nothing remembered" rather than
- * breaking the page.
- */
-
 export const MERGE_REVIEW_SORT_OPTIONS = [
   { value: "newest", label: "Newest first" },
   { value: "oldest", label: "Oldest first" },
@@ -37,6 +27,6 @@ export function rememberMergeReviewSort(sort) {
   try {
     window.sessionStorage.setItem(MERGE_REVIEW_SORT_STORAGE_KEY, sort);
   } catch {
-    // Unavailable storage just means the choice is not remembered.
+    return;
   }
 }

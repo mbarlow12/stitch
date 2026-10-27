@@ -5,12 +5,6 @@ import { MemoryRouter } from "react-router";
 import { ConfigProvider } from "../config/context-provider";
 import { getConfig } from "../config/env";
 
-/**
- * Default return value for the mocked `useAuth0` hook (mirrors setup.js).
- * Spread and override in tests that need a different auth state:
- *
- *   vi.mocked(useAuth0).mockReturnValue({ ...auth0Defaults, isAuthenticated: false });
- */
 export const auth0TestDefaults = {
   isAuthenticated: true,
   isLoading: false,

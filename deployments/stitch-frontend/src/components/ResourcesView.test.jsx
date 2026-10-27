@@ -69,7 +69,6 @@ const defaultHookReturn = {
 };
 
 beforeEach(() => {
-  // ResourcesView debounces the list query; tests call settle() to let it fire.
   vi.useFakeTimers();
   vi.mocked(useResources).mockReturnValue({
     ...defaultHookReturn,
@@ -90,26 +89,18 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  // The chosen page size is remembered for the session.
   window.sessionStorage.clear();
 });
 
-// Advances past the list query's debounce window so the latest view state
-// reaches useResources.
 function settle() {
   act(() => vi.advanceTimersByTime(DEFAULT_DEBOUNCE_MS));
 }
 
-// Mirrors ResourceDetailPage's "← Back" (navigate(-1)). Rendered as a sibling of
-// <ResourcesView /> so it shares the router. window.history.back() does not
-// drive MemoryRouter, so this is the way to exercise browser Back in jsdom.
 function BackButton() {
   const navigate = useNavigate();
   return <button onClick={() => navigate(-1)}>test-back</button>;
 }
 
-// Mirrors the header's "Resources" tab and the logotype: both link to a bare
-// "/", which carries none of the list's URL state.
 function ResourcesTabButton() {
   const navigate = useNavigate();
   return <button onClick={() => navigate("/")}>test-resources-tab</button>;
@@ -226,7 +217,6 @@ describe("ResourcesView", () => {
     const table = screen.getByRole("table");
     expect(within(table).getByText("Norway")).toBeInTheDocument();
     expect(within(table).getByText("Saudi Arabia")).toBeInTheDocument();
-    // The raw codes should not be shown in the table.
     expect(within(table).queryByText("NOR")).not.toBeInTheDocument();
     expect(within(table).queryByText("SAU")).not.toBeInTheDocument();
   });
@@ -258,8 +248,6 @@ describe("ResourcesView", () => {
   });
 
   it("keeps filter bar visible while a new query is loading", () => {
-    // Mirrors a refetch triggered by a filter change: TanStack Query resets
-    // `data` to undefined and `isLoading` to true for the new query key.
     vi.mocked(useResources).mockReturnValue({
       ...defaultHookReturn,
       data: undefined,
@@ -273,10 +261,6 @@ describe("ResourcesView", () => {
   });
 
   it("keeps showing the previous data (assets count, rows) during a background refetch", () => {
-    // With placeholderData: keepPreviousData on the query, a refetch
-    // triggered by a filter/page/sort change keeps `data` populated:
-    // isFetching is true but isLoading is false, and data is still the
-    // previous result rather than resetting to undefined.
     vi.mocked(useResources).mockReturnValue({
       ...defaultHookReturn,
       data: mockResourceData,
@@ -443,7 +427,6 @@ describe("ResourcesView", () => {
       fireEvent.click(screen.getByText("test-resources-tab"));
       settle();
 
-      // The tab still clears the view (filters), but the page size stays.
       expect(screen.getByLabelText("Per page:")).toHaveValue("50");
       expect(useResources).toHaveBeenLastCalledWith(
         ENDPOINT,
@@ -474,7 +457,6 @@ describe("ResourcesView", () => {
 
       renderWithQueryClient(<ResourcesView endpoint={ENDPOINT} />);
 
-      // scope to the table to avoid matching the FilterBar's Basin dropdown button
       const table = screen.getByRole("table");
       fireEvent.click(within(table).getByRole("button", { name: /^basin/i }));
       settle();
@@ -566,18 +548,15 @@ describe("ResourcesView", () => {
 
       renderWithQueryClient(<ResourcesView endpoint={ENDPOINT} />);
 
-      // Open the Country dropdown (scoped to the filter bar).
       fireEvent.click(
         within(screen.getByTestId("filter-bar")).getByRole("button", {
           name: /^country/i,
         }),
       );
 
-      // The option is labelled with the conventional name...
       const option = screen.getByRole("checkbox", { name: /norway/i });
       fireEvent.click(option);
 
-      // ...but the value sent to the API is the alpha-3 code.
       settle();
       expect(useResources).toHaveBeenLastCalledWith(
         ENDPOINT,
@@ -588,8 +567,6 @@ describe("ResourcesView", () => {
     });
 
     it("lists country options alphabetically by displayed name", () => {
-      // The API returns values sorted by the stored alpha-3 code, which is not
-      // the same order as the country names the user actually sees.
       vi.mocked(useResourceFilterOptions).mockReturnValue({
         ...defaultHookReturn,
         data: {
@@ -627,7 +604,6 @@ describe("ResourcesView", () => {
       ["Field status", false],
       ["Primary hydrocarbon group", false],
     ])("gives the %s filter a search box: %s", (filterLabel, hasSearch) => {
-      // Only the long, open-ended lists get one; short fixed lists don't.
       renderWithQueryClient(<ResourcesView endpoint={ENDPOINT} />);
 
       const filterBar = screen.getByTestId("filter-bar");
@@ -648,8 +624,6 @@ describe("ResourcesView", () => {
     });
 
     it("filters the Country options by name as the user types", () => {
-      // The default filter options offer NOR and SAU; the search matches
-      // the names users see, not the codes.
       renderWithQueryClient(<ResourcesView endpoint={ENDPOINT} />);
 
       const filterBar = screen.getByTestId("filter-bar");
@@ -675,7 +649,6 @@ describe("ResourcesView", () => {
 
       renderWithQueryClient(<ResourcesView endpoint={ENDPOINT} />);
 
-      // open the Region dropdown and check "Middle East"
       fireEvent.click(
         within(screen.getByTestId("filter-bar")).getByRole("button", {
           name: /region/i,
@@ -924,7 +897,6 @@ describe("ResourcesView", () => {
               params.sort_by !== undefined || params.filters.region?.length > 0,
           );
 
-      // The controls update immediately, but no query has changed yet.
       expect(screen.getByText("Sort: Basin ascending")).toBeInTheDocument();
       expect(changedCalls()).toHaveLength(0);
 
@@ -940,7 +912,6 @@ describe("ResourcesView", () => {
           filters: expect.objectContaining({ region: ["Middle East"] }),
         }),
       );
-      // Only one distinct query: the settled state, never an intermediate one.
       const distinctParams = new Set(
         changedCalls().map(([, params]) => JSON.stringify(params)),
       );
@@ -948,8 +919,6 @@ describe("ResourcesView", () => {
     });
 
     it("does not mark the table busy while waiting for clicks to settle", () => {
-      // Waiting is not loading: if the settled query is cached, its rows swap
-      // in instantly, so a busy state here would only flash for 300ms.
       vi.mocked(useResources).mockReturnValue({
         ...defaultHookReturn,
         data: mockResourceData,

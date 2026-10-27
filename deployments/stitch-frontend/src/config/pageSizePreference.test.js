@@ -34,7 +34,6 @@ describe("pageSizePreference", () => {
   });
 
   it("treats unavailable storage as nothing remembered, without throwing", () => {
-    // Some privacy modes make session storage throw on every access.
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("SecurityError");
     });

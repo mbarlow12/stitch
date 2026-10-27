@@ -15,7 +15,6 @@ function Input({
     e.target.select();
   };
 
-  // Dynamically set the size of the input based on the value
   const inputSize =
     autoSize && value ? Math.max(String(value).length, 1) : undefined;
 

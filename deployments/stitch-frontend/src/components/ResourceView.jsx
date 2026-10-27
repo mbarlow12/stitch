@@ -18,10 +18,6 @@ export default function ResourceView({
   const queryClient = useQueryClient();
   const [inputId, setInputId] = useState(1);
   const id = initialID ?? inputId;
-  // Embedded mode (showControls=false, given a known id) loads right away;
-  // interactive mode waits for the user to click Fetch / press Enter, which
-  // call refetch() directly below — refetch() always runs regardless of
-  // `enabled`, so those still work while this stays false.
   const autoFetch = !showControls && initialID != null;
   const { data, isLoading, isError, error, refetch } = useResource(
     endpoint,

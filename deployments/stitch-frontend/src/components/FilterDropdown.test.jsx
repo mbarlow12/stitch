@@ -4,8 +4,6 @@ import userEvent from "@testing-library/user-event";
 import FilterDropdown from "./FilterDropdown";
 
 const COUNTRY_OPTIONS = [
-  // Real country names come from Intl.DisplayNames, which uses a curly
-  // apostrophe (U+2019) here.
   { value: "CIV", label: "Côte d\u2019Ivoire" },
   { value: "CUW", label: "Curaçao" },
   { value: "NGA", label: "Nigeria" },
@@ -76,8 +74,6 @@ describe("FilterDropdown", () => {
       renderDropdown({ searchable: true });
       await open(user);
 
-      // Stored codes whose letters don't appear in the country name: users
-      // only ever see the name, so the code must not match.
       await user.type(screen.getByRole("searchbox"), "civ");
       expect(screen.getByText("No matches")).toBeInTheDocument();
       await user.clear(screen.getByRole("searchbox"));
@@ -103,7 +99,6 @@ describe("FilterDropdown", () => {
       renderDropdown({ searchable: true });
       await open(user);
 
-      // What a keyboard types: a straight apostrophe.
       await user.type(screen.getByRole("searchbox"), "cote d'ivoire");
       expect(visibleOptionLabels()).toEqual(["Côte d\u2019Ivoire"]);
     });
@@ -140,8 +135,8 @@ describe("FilterDropdown", () => {
       await open(user);
       await user.type(screen.getByRole("searchbox"), "nor");
 
-      await open(user); // close
-      await open(user); // reopen
+      await open(user);
+      await open(user);
 
       expect(screen.getByRole("searchbox")).toHaveValue("");
       expect(visibleOptionLabels()).toHaveLength(COUNTRY_OPTIONS.length);
@@ -156,7 +151,6 @@ describe("FilterDropdown", () => {
 
       expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
       expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-      // Focus goes back to the dropdown's button, not lost with the panel.
       expect(screen.getByRole("button", { name: /country/i })).toHaveFocus();
     });
   });

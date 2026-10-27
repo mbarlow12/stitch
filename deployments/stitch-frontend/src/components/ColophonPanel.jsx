@@ -309,8 +309,6 @@ export default function ColophonPanel({ diagnosticsOpen = false }) {
       return;
     }
 
-    // A refresh result may still be showing on this button; clear it so the
-    // copy feedback is what the user sees.
     setTokenRefreshStatus("idle");
 
     try {
@@ -326,19 +324,13 @@ export default function ColophonPanel({ diagnosticsOpen = false }) {
     }
   }
 
-  // Logging out now ends the Auth0 session (STIT-721), so a quick log out and
-  // back in no longer picks up permission changes. Skipping the token cache
-  // makes Auth0 issue a new token that carries the user's current permissions;
-  // the diagnostics and any loaded app data are then refetched with it.
   async function handleRefreshToken() {
     if (tokenRefreshStatus === "refreshing") {
       return;
     }
 
-    // The menu item is about to disappear; keep keyboard focus on the arrow.
     setTokenMenuOpen(false);
     tokenMenuButtonRef.current?.focus();
-    // Cancel an earlier refresh's label reset so it can't end this one early.
     window.clearTimeout(tokenRefreshResetTimer.current);
     setTokenRefreshStatus("refreshing");
 
@@ -371,9 +363,6 @@ export default function ColophonPanel({ diagnosticsOpen = false }) {
           <h2 className="text-sm font-semibold text-ink">Diagnostics</h2>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {/* Copy is the everyday action; refreshing is occasional, so it
-                sits behind the arrow. The main button also shows the refresh
-                result, since the menu has closed by then. */}
             <div
               ref={tokenMenuRef}
               className="relative inline-flex"
@@ -387,7 +376,6 @@ export default function ColophonPanel({ diagnosticsOpen = false }) {
               <button
                 type="button"
                 onClick={() => void handleCopyToken()}
-                // Copying mid-refresh would copy the token being replaced.
                 disabled={!accessToken || tokenRefreshStatus === "refreshing"}
                 className="rounded-l-md border border-line bg-panel px-3 py-1.5 text-sm font-medium text-ink transition-colors hover:border-line-strong hover:bg-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 title="Copy raw access token for API tools"
@@ -408,8 +396,6 @@ export default function ColophonPanel({ diagnosticsOpen = false }) {
                 ref={tokenMenuButtonRef}
                 type="button"
                 onClick={() => setTokenMenuOpen((open) => !open)}
-                // Stays enabled during a refresh so it can keep keyboard focus;
-                // the menu item is what blocks a second refresh.
                 disabled={!isAuthenticated}
                 aria-label="More token actions"
                 aria-expanded={tokenMenuOpen}

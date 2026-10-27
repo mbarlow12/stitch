@@ -13,30 +13,14 @@ from .errors import StitchAPIError
 logger = logging.getLogger("stitch.client")
 
 MAX_PAGE_SIZE = 200
-"""Server cap on ``page_size`` (``PaginationParams.page_size`` is ``Field(50, ge=1, le=200)``)."""
 
 _IDEMPOTENT_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "TRACE", "PUT", "DELETE"})
-"""Methods safe to retry after a completed 5xx response (RFC 7231 idempotent set).
-
-A 5xx may follow a request the server already partially applied, so retrying it
-is only safe when repeating the request has no additional effect. POST/PATCH are
-excluded. Statuses below 500 (429, 408) are unprocessed/pre-processing and retry
-regardless of method.
-"""
 
 _UNSENT_TRANSPORT_ERRORS = (
     httpx.ConnectError,
     httpx.ConnectTimeout,
     httpx.PoolTimeout,
 )
-"""Transport failures that occur before the request is put on the wire.
-
-The connection was never established (or never acquired from the pool), so the
-server cannot have seen the request -- these are safe to retry on any method,
-idempotent or not. Every other transport error (a read/write timeout, a dropped
-connection mid-response, a bare ``OSError``) may follow a request the server
-already applied, so it is only retried on an idempotent method.
-"""
 
 
 class AsyncStitchClient:

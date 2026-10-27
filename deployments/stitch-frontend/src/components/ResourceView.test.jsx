@@ -206,18 +206,11 @@ describe("ResourceView", () => {
     const { queryClient } = renderWithQueryClient(
       <ResourceView endpoint="/api/v1/resources/{id}" />,
     );
-    // useResource is mocked, so nothing populates the cache on its own.
-    // Seed the real cache entry under the "view" key (what useResource
-    // actually uses) so this test can prove Clear Cache removes it, rather
-    // than passing vacuously because nothing was ever there.
     const viewKey = ["/api/v1/resources/{id}", "view", 1];
     queryClient.setQueryData(viewKey, { id: 1, name: "Test Resource" });
 
     await user.click(screen.getByRole("button", { name: /clear cache/i }));
 
-    // resetQueries clears cached data back to its initial (pending) state;
-    // it doesn't deregister the query entirely, so assert on the data, not
-    // on getQueryState being undefined.
     await waitFor(() => {
       expect(queryClient.getQueryData(viewKey)).toBeUndefined();
     });

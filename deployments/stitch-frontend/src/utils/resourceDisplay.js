@@ -28,7 +28,6 @@ export function deriveProvenance(resource) {
   for (const [field, value] of Object.entries(data)) {
     if (!isPrimitive(value) || field === "id") continue;
 
-    // SOURCES order intentionally decides the winner for duplicate field values.
     for (const source of SOURCES) {
       const records = resource.source_data[source] ?? [];
       if (records.some((record) => record?.[field] === value)) {

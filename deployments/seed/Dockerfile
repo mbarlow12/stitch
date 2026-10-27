@@ -1,4 +1,3 @@
-# ── base: Python + uv + third-party deps ─────────────────────────────
 FROM python:3.12-slim-trixie AS base
 
 ENV PYTHONUNBUFFERED=1 \
@@ -11,14 +10,11 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.30 /uv /uvx /bin/
 
 WORKDIR /app
 
-# Third-party deps only — cached until uv.lock changes.
-# All metadata via bind mounts (not copied into the layer).
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --frozen --no-install-workspace --package stitch-seed
 
-# ── runtime target ────────────────────────────────────────────────────
 FROM base AS runtime
 
 RUN groupadd --system --gid 999 stitch-app \
@@ -35,7 +31,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ENV PATH="/app/.venv/bin:$PATH"
 USER stitch-app
 
-# Sensible defaults (override in compose/env as needed)
 ENV API_BASE_URL="http://api:8000/api/v1" \
     FAKER_POST_COUNT="5"
 

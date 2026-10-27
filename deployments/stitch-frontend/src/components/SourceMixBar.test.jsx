@@ -30,7 +30,6 @@ describe("SourceMixBar", () => {
   it("renders bar segments for active sources", () => {
     const { container } = render(<SourceMixBar provenance={mixedSources} />);
     const segments = container.querySelectorAll("[title]");
-    // Each active source gets a titled segment
     expect(segments.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -50,7 +49,6 @@ describe("SourceMixBar", () => {
 
   it("only renders labels for sources with records", () => {
     render(<SourceMixBar provenance={singleSource} showLabels />);
-    // wm has 0 records — its label should not appear
     expect(screen.queryByText(SOURCE_LABELS.wm)).not.toBeInTheDocument();
   });
 

@@ -2,26 +2,11 @@ name: CD Pipeline
 
 on:
   pull_request:
-    # labeled/unlabeled are included so toggling the 'no-deploy' label (see the
-    # resolve-context guard) takes effect immediately instead of waiting for the
-    # next push. The default types must be listed explicitly once any are named.
     types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main, production]
   workflow_dispatch:
 
-# Serialize per PR (or per pushed ref) so a new commit -- or the 'no-deploy'
-# label event -- supersedes an in-flight deploy for the same target. The group
-# key deliberately omits the event type so 'labeled' and 'synchronize' share a
-# lane and can cancel each other; github.workflow keeps this separate from the
-# node/python check workflows.
-#
-# cancel-in-progress fires for code changes (synchronize/opened/reopened) and for
-# the 'no-deploy' label specifically, but NOT for other label changes: this
-# workflow triggers on every labeled/unlabeled event, and adding an unrelated
-# label (e.g. 'bug') must not interrupt and restart an in-flight deploy. Non-PR
-# events (push/dispatch to main/production) are never cancelled, so they run their
-# migrations to completion.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: >-
@@ -30,36 +15,6 @@ concurrency:
     || github.event.label.name == 'no-deploy') }}
 
 jobs:
-  # This pipeline deploys per-PR preview environments and needs repository
-  # secrets, which the pull_request event withholds from two kinds of PR: PRs
-  # opened from a fork (secrets never flow to forks) and bot-authored PRs
-  # (Dependabot in particular always runs without secrets, and other bots can't
-  # be reliably told apart from it). Gate on both so those PRs skip the pipeline
-  # instead of failing: require the PR to originate from this repo (not a fork)
-  # and to be authored by a human -- user.type == 'User' excludes every bot,
-  # current or future, with no denylist to maintain.
-  #
-  # NB: author_association is deliberately NOT used. It reports MEMBER only for
-  # *public* org members, so our private-membership humans surface as
-  # CONTRIBUTOR -- indistinguishable from Dependabot -- which silently skips
-  # every internal PR.
-  #
-  # Future option: to let a human opt a specific bot PR into deploying, add a
-  # label trigger (on.pull_request.types: [..., labeled]) and OR a label check
-  # into these guards, e.g.
-  # contains(github.event.pull_request.labels.*.name, 'deploy-preview').
-  # (Dependabot PRs still receive no secrets even when labeled; those need a
-  # human to re-push the branch under their own PR.)
-  #
-  # A PR labeled 'no-deploy' opts out of the build/deploy pipeline entirely: the
-  # guard fails, resolve-context is skipped, and the rest of the pipeline skips
-  # with it. The language-level checks (Node / Python workflows) are separate and
-  # still run. Toggling the label re-runs this workflow (see on.pull_request.types
-  # above), so removing it re-enables deploys without needing a new push.
-  #
-  # Every job transitively needs resolve-context, so skipping it here skips the
-  # rest -- except deploy-frontend and comment-summary, whose always()/!failure()
-  # conditions ignore skipped dependencies and so repeat this guard explicitly.
   resolve-context:
     if: >-
       ${{ github.event_name != 'pull_request'
@@ -115,10 +70,6 @@ jobs:
           : "${AUTH_DISABLED:?Missing required variable AUTH_DISABLED}"
           : "${AUTH0_DOMAIN:?Missing required variable AUTH0_DOMAIN}"
           : "${AUTH0_CLIENT_ID:?Missing required variable AUTH0_CLIENT_ID}"
-          # AUTH_AUDIENCE is the single source for the Auth0 API audience; it feeds
-          # both the backend services and the frontend's auth0Audience, so it is
-          # required on every lane -- including auth-disabled ones, where the
-          # frontend still configures its Auth0 client.
           : "${AUTH_AUDIENCE:?Missing required variable AUTH_AUDIENCE}"
           : "${STITCH_APP_PASSWORD:?Missing required secret STITCH_APP_PASSWORD}"
           : "${STITCH_CLIENT_PRIVILEGED_BEARER_TOKEN:?Missing required secret STITCH_CLIENT_PRIVILEGED_BEARER_TOKEN}"
@@ -132,10 +83,6 @@ jobs:
               ;;
           esac
 
-          # AUTH_ISSUER and AUTH_JWKS_URI are optional overrides: when unset they
-          # are derived from AUTH0_DOMAIN in the "Export auth config" step below.
-          # To avoid mismatched overrides (common with Auth0 custom domains), require
-          # that they are either both set or both unset.
           if [ -n "${AUTH_ISSUER:-}" ] && [ -z "${AUTH_JWKS_URI:-}" ]; then
             echo "AUTH_JWKS_URI must be set when AUTH_ISSUER is set." >&2
             exit 1
@@ -168,11 +115,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          # This must match where the frontend actually lands, because it is the
-          # single origin the API/EL/LLM services allow for CORS. A pull request
-          # always deploys to a preview environment named for the PR number; any
-          # other event is a push to a lane's production branch, which deploys to
-          # that lane's Static Web App production environment.
           if [ "${EVENT_NAME}" = "pull_request" ]; then
             frontend_origin_url="${FRONTEND_PREVIEW_URL_TEMPLATE//\{name\}/${PR_NUMBER}}"
           else
@@ -186,9 +128,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Issuer and JWKS URI derive from the Auth0 tenant domain by default;
-          # an explicit AUTH_ISSUER / AUTH_JWKS_URI variable overrides the derived
-          # value for lanes on an Auth0 custom domain, where the host differs.
           auth_issuer="${AUTH_ISSUER:-https://${AUTH0_DOMAIN}/}"
           auth_jwks_uri="${AUTH_JWKS_URI:-https://${AUTH0_DOMAIN}/.well-known/jwks.json}"
           echo "auth-disabled=${AUTH_DISABLED}" >> "$GITHUB_OUTPUT"
@@ -197,7 +136,6 @@ jobs:
           echo "auth-jwks-uri=${auth_jwks_uri}" >> "$GITHUB_OUTPUT"
           echo "auth0-domain=${AUTH0_DOMAIN}" >> "$GITHUB_OUTPUT"
           echo "auth0-client-id=${AUTH0_CLIENT_ID}" >> "$GITHUB_OUTPUT"
-          # The frontend's auth0Audience is the same value as the backend audience.
           echo "auth0-audience=${AUTH_AUDIENCE}" >> "$GITHUB_OUTPUT"
           echo "stitch-llm-azure-openai-base-url=${STITCH_LLM_AZURE_OPENAI_BASE_URL}" >> "$GITHUB_OUTPUT"
           echo "stitch-llm-azure-openai-model=${STITCH_LLM_AZURE_OPENAI_MODEL}" >> "$GITHUB_OUTPUT"
@@ -249,8 +187,6 @@ jobs:
 
   build-seed-docker-image:
     name: "Build and publish Seed"
-    # Seed only runs in development; non-development lanes are populated by the
-    # ETL pipelines instead (one or the other, never both).
     if: ${{ needs.resolve-context.outputs.deployment-lane == 'development' }}
     needs: [resolve-context]
     uses: ./.github/workflows/build-and-push-Docker-image.yml
@@ -289,10 +225,6 @@ jobs:
       postgres-db: ${{ needs.deploy-db.outputs.postgres-db }}
       postgres-sslmode: ${{ needs.deploy-db.outputs.postgres-sslmode }}
 
-  # Rebuilds the API's resource-state read model with the code just deployed
-  # (see deployments/api/READ_MODEL.md). Nothing waits on this job: the write
-  # paths keep the rows current, so the rebuild only repairs drift and picks up
-  # changes to how answers are computed, and a failure never blocks a deploy.
   rebuild-read-model:
     name: "Rebuild Read Model"
     needs: [resolve-context, build-api-docker-image, deploy-db, run-db-migrations, deploy-api]
@@ -352,7 +284,6 @@ jobs:
         OTEL_SERVICE_NAME=stitch-api
         OTEL_RESOURCE_ATTRIBUTES=deployment.name=${{ needs.resolve-context.outputs.deployment-name }},deployment.lane=${{ needs.resolve-context.outputs.deployment-lane }},service.version=${{ github.sha }}
       deployment-label: api
-      # Only the production release stays warm; everything else scales to zero.
       min-replicas: ${{ needs.resolve-context.outputs.always-on }}
 
   deploy-stitch-llm:
@@ -385,7 +316,6 @@ jobs:
         OTEL_SERVICE_NAME=stitch-llm
         OTEL_RESOURCE_ATTRIBUTES=deployment.name=${{ needs.resolve-context.outputs.deployment-name }},deployment.lane=${{ needs.resolve-context.outputs.deployment-lane }},service.version=${{ github.sha }}
       deployment-label: stitch-llm
-      # Only the production release stays warm; everything else scales to zero.
       min-replicas: ${{ needs.resolve-context.outputs.always-on }}
 
   deploy-etl:
@@ -406,11 +336,8 @@ jobs:
       container-app-name: ${{ format('{0}-etl', needs.resolve-context.outputs.deployment-name) }}
       registry-server: ghcr.io
       registry-username: ${{ needs.lane-config-validate.outputs.ghcr-etl-pull-username }}
-      # One job per dataset + in-memory /status state: keep exactly one replica.
       min-replicas: "1"
       max-replicas: "1"
-      # WoodMac is unoptimized; needs more than the default ~0.5 vCPU / 1 GiB.
-      # 4 GiB on the Consumption profile is only valid paired with 2.0 vCPU.
       cpu: "2.0"
       memory: "4.0Gi"
       environment-variables: >-
@@ -424,13 +351,11 @@ jobs:
         GEM_FILE_DIR=/mnt/data/gem
         WOODMAC_DATA_DIR=/mnt/data/woodmac
       deployment-label: etl
-      # Mount the lane's Azure Files share; GEM reads gem/, WoodMac caches under woodmac/.
       storage-name: ${{ needs.lane-config-validate.outputs.etl-storage-name }}
       storage-mount-path: /mnt/data
 
   run-seed:
     name: "Run seed"
-    # Seed only runs in development; non-development lanes use the ETL pipelines.
     if: ${{ needs.resolve-context.outputs.deployment-lane == 'development' && needs.deploy-db.outputs.database-created == 'true' }}
     needs: [resolve-context, build-seed-docker-image, deploy-db, deploy-api]
     uses: ./.github/workflows/run-seed.yml
@@ -443,10 +368,6 @@ jobs:
 
   deploy-frontend:
     name: "Deploy frontend"
-    # ETL deploys are skipped in the development lane; gate on no-failure rather
-    # than all-success so the frontend still deploys when they are skipped.
-    # The human-author clause repeats the resolve-context guard because
-    # !failure() also passes when upstream jobs were skipped by that guard.
     if: >-
       ${{ (!failure() && !cancelled())
       && (github.event_name != 'pull_request'
@@ -467,17 +388,9 @@ jobs:
       auth0-domain: ${{ needs.lane-config-validate.outputs.auth0-domain }}
       auth0-client-id: ${{ needs.lane-config-validate.outputs.auth0-client-id }}
       auth0-audience: ${{ needs.lane-config-validate.outputs.auth0-audience }}
-      # Each lane has its own Static Web App, so each has its own production
-      # branch: the development lane's SWA is fed by `main`, the staging and
-      # production lanes' SWA by `production`. A push to the matching
-      # branch deploys to that SWA's production environment -- the only
-      # environment Azure lets us attach a custom domain to. Pull requests are
-      # always preview environments regardless of this value.
       production-branch: ${{ needs.resolve-context.outputs.deployment-lane == 'development' && 'main' || 'production' }}
 
   comment-summary:
-    # always() ignores the resolve-context guard's skips, so repeat it here too --
-    # including the 'no-deploy' exclusion, so a skipped pipeline posts no summary.
     if: >-
       ${{ always() && github.event_name == 'pull_request'
       && github.event.pull_request.head.repo.full_name == github.repository

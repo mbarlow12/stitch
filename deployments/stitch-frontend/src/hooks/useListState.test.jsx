@@ -22,7 +22,6 @@ function Probe() {
       <button onClick={() => setPage(3)}>page</button>
       <button onClick={() => setPageSize(25)}>pageSize</button>
       <button onClick={() => navigate(-1)}>back</button>
-      {/* What the Resources tab and logotype do: a bare list URL. */}
       <button onClick={() => navigate("/")}>resources tab</button>
     </>
   );
@@ -47,7 +46,6 @@ describe("useListState", () => {
   it("writes filters to the URL", () => {
     renderProbe();
     fireEvent.click(screen.getByText("filter"));
-    // page_size rides along with any other state, so the link is exact.
     expect(url()).toBe("/?page_size=10&country=NOR");
   });
 
@@ -72,9 +70,7 @@ describe("useListState", () => {
   it("pushes a history entry and resets to page 1 when page size changes", () => {
     renderProbe("/?page=4");
     fireEvent.click(screen.getByText("pageSize"));
-    // Should reset to page 1, so page=4 is gone
     expect(url()).not.toContain("page=4");
-    // Back should return to the pre-action state (proves it pushed, not replaced)
     fireEvent.click(screen.getByText("back"));
     expect(url()).toBe("/?page=4");
   });

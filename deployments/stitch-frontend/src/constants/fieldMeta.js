@@ -1,15 +1,4 @@
-/**
- * Field metadata dictionary.
- * Maps JSON payload keys to display configuration.
- * `section` groups fields into page sections on the detail view.
- * `options` lists every value the API accepts for a fixed-value field, so
- * manual edit offers a dropdown instead of free text. These must match the
- * Literal types in packages/stitch-ogsi/src/stitch/ogsi/model/types.py --
- * a value missing here cannot be chosen, and a value the API no longer
- * accepts would be rejected on save.
- */
 export const FIELD_META = {
-  // Identity & Location
   name: { label: "Name", section: "identity" },
   name_local: { label: "Local Name", section: "identity" },
   country: { label: "Country", section: "identity" },
@@ -24,11 +13,9 @@ export const FIELD_META = {
     options: ["Onshore", "Offshore", "Unknown"],
   },
 
-  // Organizations
   owners: { label: "Owner", section: "organizations" },
   operators: { label: "Operator", section: "organizations" },
 
-  // Production & Geology
   field_status: {
     label: "Field Status",
     section: "production",
@@ -73,10 +60,6 @@ export const PRODUCTION_FIELDS = Object.entries(FIELD_META)
   .filter(([, v]) => v.section === "production")
   .map(([k]) => k);
 
-/**
- * Fields always shown side by side in the Merge Review source comparison.
- * Order is display order.
- */
 export const MERGE_COMPARISON_CORE_FIELDS = [
   "name",
   "country",
@@ -85,21 +68,11 @@ export const MERGE_COMPARISON_CORE_FIELDS = [
   "state_province",
 ];
 
-/**
- * Attributes reviewers weigh most heavily when judging a merge candidate.
- * Shown first in the "Other attributes" accordion so they do not have to be
- * scanned for. Order is display order.
- */
 const MERGE_COMPARISON_LEAD_OTHER_FIELDS = [
   "field_status",
   "production_start_year",
 ];
 
-/**
- * Remaining scalar fields for the collapsed "Other attributes" accordion.
- * Organizations (owners/operators) are nested lists and are not compared.
- * The lead fields come first; the rest keep FIELD_META order.
- */
 export const MERGE_COMPARISON_OTHER_FIELDS = [
   ...MERGE_COMPARISON_LEAD_OTHER_FIELDS,
   ...Object.keys(FIELD_META).filter(

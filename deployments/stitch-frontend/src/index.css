@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand palette */
   --color-bluespruce: #003b63;
   --color-energy: #45cfcc;
   --color-basalt: #58595b;
@@ -61,7 +60,6 @@
   --color-rmigray-700: #2a2a2b;
   --color-rmigray-800: #231f20;
 
-  /* Application semantics */
   --color-canvas: var(--color-neutral-50);
   --color-panel: #fbfdfe;
   --color-surface: var(--color-neutral-100);
@@ -81,7 +79,6 @@
   --color-danger: var(--color-error-600);
   --color-danger-soft: #fbe4df;
 
-  /* Compatibility aliases used by existing components. */
   --color-gray-light: var(--color-surface);
   --color-gray-medium: var(--color-line);
   --color-gray-dark: var(--color-ink);

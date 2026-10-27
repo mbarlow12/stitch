@@ -43,7 +43,6 @@ describe("useDebouncedValue", () => {
     act(() => vi.advanceTimersByTime(200));
     rerender({ value: "d" });
 
-    // 400ms since the first change, but only 0ms since the last one.
     expect(result.current).toBe("a");
 
     act(() => vi.advanceTimersByTime(DEFAULT_DEBOUNCE_MS));

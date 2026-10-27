@@ -85,11 +85,8 @@ jobs:
         run: |
           set -euox pipefail
           RAW_NAME="${DB_NAME_RAW}"
-          # Lowercase
           CLEAN=$(echo "$RAW_NAME" | tr '[:upper:]' '[:lower:]')
-          # Replace anything not a-z, 0-9, or underscore with underscore
           CLEAN=$(echo "$CLEAN" | sed -E 's/[^a-z0-9_]/_/g')
-          # Trim to 63 chars (Postgres identifier limit)
           CLEAN=$(echo "$CLEAN" | cut -c1-63)
           echo "db-name=$CLEAN" >> "$GITHUB_OUTPUT"
 
@@ -138,7 +135,6 @@ jobs:
           echo "Target server: $PGHOST"
           echo "Creating DB: $DB_NAME"
 
-          # Check existence first (CREATE DATABASE doesn't support IF NOT EXISTS)
           EXISTS=$(psql -X -tAc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" || true)
 
           if [ "$EXISTS" = "1" ]; then

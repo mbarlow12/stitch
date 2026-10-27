@@ -70,8 +70,6 @@ describe("prewarmApi", () => {
   });
 
   it("does nothing when the base URL is not a string, rather than throwing", async () => {
-    // The contract is that this never rejects, because bootstrap does not await
-    // it -- a synchronous throw would escape and take the app down with it.
     await expect(prewarmApi({ apiBaseUrl: 42 })).resolves.toBeUndefined();
     await expect(prewarmApi({ apiBaseUrl: {} })).resolves.toBeUndefined();
 

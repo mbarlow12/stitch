@@ -134,7 +134,6 @@ export default function EntityLinkagePage() {
     try {
       const token = await getToken();
 
-      // apply_merges is a query parameter on this route, not a body field.
       const response = await fetch(
         `${baseUrl}/oil-gas-fields/merge-candidates/link-all?apply_merges=${applyMerges}`,
         {

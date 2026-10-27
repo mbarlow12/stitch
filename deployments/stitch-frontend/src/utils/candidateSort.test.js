@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sortCandidates } from "./candidateSort";
 
-// The API lists candidates newest first; tests use that order as given.
 const CANDIDATES = [{ id: 5 }, { id: 4 }, { id: 3 }, { id: 2 }, { id: 1 }];
 const ids = (list) => list.map((candidate) => candidate.id);
 
@@ -47,10 +46,7 @@ describe("sortCandidates", () => {
       [1, "Zubair"],
     ]);
 
-    // The test runs with an English default language, where base
-    // sensitivity ignores case and accents.
     it("sorts A to Z, ignoring case and accents in English", () => {
-      // "Ábalos" sorts with "Abalos", before "Abbott".
       expect(ids(sortCandidates(CANDIDATES, "name-asc", names))).toEqual([
         4, 3, 5, 2, 1,
       ]);
@@ -63,7 +59,6 @@ describe("sortCandidates", () => {
     });
 
     it("breaks ties between equal names newest first, in both directions", () => {
-      // "burgan" (5) and "Burgan" (2) are equal ignoring case.
       const asc = ids(sortCandidates(CANDIDATES, "name-asc", names));
       const desc = ids(sortCandidates(CANDIDATES, "name-desc", names));
       expect(asc.indexOf(5)).toBeLessThan(asc.indexOf(2));
@@ -86,9 +81,6 @@ describe("sortCandidates", () => {
 });
 
 describe("sortCandidates in a non-English browser", () => {
-  // Names sort the way the reviewer's browser language alphabetizes. In
-  // Swedish, "ä" is its own letter sorted after "z", so a Swedish reviewer
-  // sees Swedish order rather than English.
   afterEach(() => {
     vi.restoreAllMocks();
     vi.resetModules();
@@ -96,7 +88,6 @@ describe("sortCandidates in a non-English browser", () => {
 
   it("follows the browser's language", async () => {
     const RealCollator = Intl.Collator;
-    // A regular function, not an arrow, because the code calls it with `new`.
     vi.spyOn(Intl, "Collator").mockImplementation(
       function SwedishDefaultCollator(locales, options) {
         return new RealCollator(locales ?? "sv", options);
@@ -116,7 +107,6 @@ describe("sortCandidates in a non-English browser", () => {
       "name-asc",
       names,
     );
-    // Swedish order: "Ägir" after "Zeta" (in English it would come first).
     expect(sorted.map((candidate) => candidate.id)).toEqual([1, 3, 2]);
   });
 });

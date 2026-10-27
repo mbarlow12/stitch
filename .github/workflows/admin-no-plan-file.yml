@@ -14,15 +14,6 @@ jobs:
       - name: Ensure no plan files are tracked
         shell: bash
         run: |
-          # Plan files are useful to commit alongside a change set as a record
-          # of intent, but must be removed before merging. This fails if any
-          # matching file is tracked by git on this branch.
-          #
-          # Matches (case-insensitive), at the repo root or any subdirectory:
-          #   PLAN.md, PLAN.<anything>.md  (e.g. PLAN.feature-x.md)
-          #
-          # Capture tracked files first so a git failure surfaces instead of
-          # being swallowed by grep's no-match exit under `set -o pipefail`.
           tracked="$(git ls-files)"
           found="$(printf '%s\n' "$tracked" | grep -iE '(^|/)PLAN(\.[^/]+)*\.md$' || true)"
 

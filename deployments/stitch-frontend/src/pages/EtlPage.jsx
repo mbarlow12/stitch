@@ -7,8 +7,6 @@ import Button from "../components/Button";
 import Input from "../components/Input";
 import StateBadge from "../components/StateBadge";
 
-// Per-ETL run parameters. Empty number/text fields are omitted from the
-// request body so the service falls back to its env-derived defaults.
 const GEM_FIELDS = [
   {
     key: "payload_limit",
@@ -41,8 +39,6 @@ const CCR_FIELDS = [
   },
 ];
 
-// Mirrors stitch-etl-poc's BcStartRequest (payload_limit + use_cached); the BC
-// ETL fetches live from the BCER API + reserves CSV, so there is no sheet input.
 const BC_FIELDS = [
   {
     key: "payload_limit",
@@ -57,7 +53,6 @@ const BC_FIELDS = [
   },
 ];
 
-// No run parameters needed as of 2026-09-23 for ALB or NOR.
 const ALB_FIELDS = [];
 const NOR_FIELDS = [];
 
@@ -173,7 +168,6 @@ function EtlPanel({ title, description, baseUrl, fields, getToken }) {
     setError(null);
 
     try {
-      // GET /status is unauthenticated per the ETL OpenAPI spec.
       const response = await fetch(`${baseUrl}/status`);
       const parsed = await parseJsonResponse(response);
 

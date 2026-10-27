@@ -1,11 +1,5 @@
 export const SOURCES = ["rmi", "wm", "ccr", "bc", "alb", "nor", "gem", "llm"];
 
-/**
- * Priority order for coalescing a value across sources, best first. Mirrors
- * the backend's canonical SOURCE_PRIORITY in
- * packages/stitch-ogsi/src/stitch/ogsi/model, which is the single source of
- * truth. Keep this list in sync with it until the constant is generated.
- */
 export const SOURCE_PRIORITY = [
   "rmi",
   "wm",
@@ -18,14 +12,14 @@ export const SOURCE_PRIORITY = [
 ];
 
 export const SOURCE_COLORS = {
-  gem: "#45cfcc", // energy teal
-  wm: "#7b76ad", // RMI purple
-  ccr: "#f2994a", // amber
-  alb: "#eb5757", // red
-  bc: "#27ae60", // green
-  nor: "#c14ea3", // magenta
-  rmi: "#ffcb00", // solar
-  llm: "#529cba", // RMI blue
+  gem: "#45cfcc",
+  wm: "#7b76ad",
+  ccr: "#f2994a",
+  alb: "#eb5757",
+  bc: "#27ae60",
+  nor: "#c14ea3",
+  rmi: "#ffcb00",
+  llm: "#529cba",
 };
 
 export const SOURCE_LABELS = {
@@ -41,5 +35,4 @@ export const SOURCE_LABELS = {
 
 export const UNKNOWN_SOURCE_LABEL = "Source unavailable";
 
-/** Neutral border color when no source is specified or recognized. */
 export const DEFAULT_FIELD_COLOR = "#d6dde2";
