@@ -15,6 +15,7 @@ members = [
   "packages/stitch-models",
   "packages/stitch-observability",
   "packages/stitch-ogsi",
+  "packages/stitch-app",
 ]
 
 [tool.uv.sources]
