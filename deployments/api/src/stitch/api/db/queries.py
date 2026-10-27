@@ -1,14 +1,3 @@
-"""Pure construction of the source- and resource-list query/count statements.
-
-Attribute values live in the long ``oil_gas_field_source_values`` table, not as
-wide columns. The *source* path pivots each active-membership record's value rows
-back into a wide, one-row-per-record CTE; the *resource* path first coalesces the
-priority-winning value per ``(resource, colname)`` (``build_coalesced_values``)
-and pivots that. Both narrow the pivot to only the attributes the current query
-filters or sorts on, then build the filtered, sorted, paginated id-``Select`` the
-endpoint needs. Construction is pure (no session); execution + hydration live in
-``og_field_source_actions`` / ``og_field_resource_actions``.
-"""
 
 from __future__ import annotations
 
@@ -42,8 +31,6 @@ from stitch.api.db.model.oil_gas_field_source_value import value_attr_for
 from stitch.api.entities import OGFieldQueryParams
 from stitch.ogsi.model.types import OGSISrcKey
 
-# Single source of truth for the source-list field metadata. This is a shared
-# cross-module contract: the resource-list actions import these constants too.
 Q_FIELDS: Final[tuple[str, ...]] = (
     "name",
     "name_local",
@@ -61,20 +48,10 @@ EXACT_MATCH_FIELDS: Final[tuple[str, ...]] = (
     "primary_hydrocarbon_group",
 )
 
-# Sort targets resolved from a header/identity column rather than a pivoted value
-# column: ``id``/``resource_id`` map to the path's own id, ``source`` to the
-# source key. None of these need a pivoted value column.
 _HEADER_SORT_FIELDS: Final[frozenset[str]] = frozenset({"id", "source", "resource_id"})
 
 
 def _filter_values(params: OGFieldQueryParams, field_name: str) -> list[Any]:
-    """The values an exact-match filter is set to, as a list.
-
-    Multi-select fields arrive as lists; the rest are scalars, returned as a
-    list of one so callers need only one shape. An unset filter and an empty
-    list both come back empty, which means "not filtering on this field" — an
-    empty list must never reach SQL as `IN ()`, which matches nothing.
-    """
     value = getattr(params, field_name, None)
     if value is None:
         return []
@@ -82,13 +59,6 @@ def _filter_values(params: OGFieldQueryParams, field_name: str) -> list[Any]:
 
 
 def _participating_columns(params: OGFieldQueryParams) -> list[str]:
-    """Value attributes the query actually touches -- the columns to pivot.
-
-    The sort field (unless it resolves from a header column), every *set*
-    exact-match field, and ``Q_FIELDS`` when a substring search is requested.
-    Identity columns (``id``) are never here: they are filtered/sorted against
-    the path's own id column, not pivoted. Order is preserved, duplicates removed.
-    """
     participating: list[str] = []
     if params.sort_by not in _HEADER_SORT_FIELDS:
         participating.append(params.sort_by)
@@ -104,7 +74,6 @@ def _participating_columns(params: OGFieldQueryParams) -> list[str]:
 
 
 def _override_join(resource_id: Any) -> ColumnElement[bool]:
-    """Join condition matching an override row to its value row."""
     m = MembershipModel
     v = OilGasFieldSourceValueModel
     o = OGFieldResourceSourcePriority
@@ -132,10 +101,6 @@ def construct_base_query_statement(
             r.id.label("resource_id"),
             m.source.label("source"),
             m.source_pk.label("source_pk"),
-            # Two columns, not a collapsed COALESCE: tiering (curated records above
-            # default ones) needs override_priority NULLS LAST as a distinct sort
-            # key. Absent an override row for the value, override_priority is NULL
-            # and only default_priority ranks the row (identical to no overrides).
             o.priority.label("override_priority"),
             p.priority.label("default_priority"),
             v.colname.label("colname"),
@@ -158,9 +123,6 @@ def construct_base_query_statement(
         active_src = active_src.where(
             m.source.in_(list(dict.fromkeys(licensed_sources)))
         )
-    # Narrow to specific resources before ranking so the window partitions cover
-    # only those resources -- a detail/page hydration must not rank every active
-    # row in the table.
     if resource_ids is not None:
         active_src = active_src.where(
             m.resource_id.in_(list(dict.fromkeys(resource_ids)))
@@ -187,7 +149,6 @@ def base_source_query(
     stmt = select(pivot_cte.c.source_pk)
     for cond in _build_field_conditions(pivot_cte, params):
         stmt = stmt.where(cond)
-    # source is a source-path-only filter; the resource universe is source-ignoring.
     stmt = stmt.where(pivot_cte.c.source.in_(list(dict.fromkeys(params.source))))
     if params.id is not None:
         stmt = stmt.where(pivot_cte.c.source_pk == params.id)
@@ -195,21 +156,6 @@ def base_source_query(
 
 
 def _ranked(base_cte: CTE) -> CTE:
-    """Attach the tiered coalesce rank ``rn`` to every candidate row (no cut).
-
-    Single source of truth for "who beats whom", shared by the winner cut
-    (``add_ranking`` -> ``rn == 1``), the per-field listing
-    (``field_source_candidates``), and the all-candidates detail hydration
-    (``coalesced_candidate_rows``) so they can't drift. ``rn == 1`` is the winner
-    within each ``(resource_id, colname)`` partition.
-
-    The order is tiered: curated records (an override row exists for the value, so
-    ``override_priority`` is NOT NULL) rank above default ones (``NULLS LAST`` is
-    the tier split), then global default priority, then source/source_pk
-    tiebreaks. No empty-string handling is needed here: empty text can't be
-    persisted (write-path skip + DB CHECK ``ck_source_value_text_nonempty``, see
-    ``model.oil_gas_field_source_value``).
-    """
     cols = base_cte.c
     return (
         select(base_cte)
@@ -217,9 +163,6 @@ def _ranked(base_cte: CTE) -> CTE:
             func.row_number()
             .over(
                 partition_by=(cols.resource_id, cols.colname),
-                # Tiered: curated records (override_priority NOT NULL) rank above
-                # default ones (NULLS LAST is the tier split), then global default
-                # priority, then source/source_pk tiebreaks.
                 order_by=(
                     cols.override_priority.asc().nulls_last(),
                     cols.default_priority.asc(),
@@ -242,16 +185,6 @@ def coalesced_winner_rows(
     resource_ids: Collection[int],
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> Select[tuple[Any, ...]]:
-    """Winning ``(value, source)`` per ``(resource, field)`` for given resources.
-
-    One row per ``(resource_id, colname)`` that wins coalescing -- the same
-    priority ranking the detail view uses (``add_ranking``). The read model's
-    rows are built from it (``read_model.state``). The base CTE is
-    narrowed to ``resource_ids`` *before* ranking, so the window partitions cover
-    only the requested resources rather than the whole table. Callers materialize
-    the typed value and read the winning ``source``/``source_pk`` as provenance;
-    the winner is already chosen in SQL, so no priority logic remains in Python.
-    """
     base = construct_base_query_statement(licensed_sources, resource_ids=resource_ids)
     winners = add_ranking(base).cte("coalesced_winners")
     return select(
@@ -270,16 +203,6 @@ def field_source_candidates(
     field: str,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> Select[tuple[Any, ...]]:
-    """Every source record's value for one field of one resource, winner-first.
-
-    The same tiered ranking as coalescing, sharing ``_ranked`` with
-    ``add_ranking`` -- this is that ranking *without* the ``rn == 1`` cut, so it
-    returns all candidate rows for the field ordered best-first (by ``rn``).
-    Empty text can't be persisted (write-path skip + DB CHECK), so the row set is
-    exactly the field's eligible sources. ``is_override`` is true when a curator
-    has re-ranked this record for the field (an override row exists).
-    Powers both the read endpoint and the write-path eligibility/no-op checks.
-    """
     base = construct_base_query_statement(licensed_sources, resource_ids=[resource_id])
     ranked = _ranked(base)
     c = ranked.c
@@ -301,25 +224,6 @@ def coalesced_candidate_rows(
     resource_ids: Collection[int],
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> Select[tuple[Any, ...]]:
-    """Every ranked candidate value row for the given resources, winner-first.
-
-    ``coalesced_winner_rows`` *without* the ``rn == 1`` cut: it keeps all
-    candidate rows (each tagged with ``rn``) and joins each source header for
-    ``source_record``. This lets the detail path build both the coalesced view +
-    provenance (the ``rn == 1`` rows) and the raw ``source_data`` (all rows,
-    grouped by ``source_pk``) from a SINGLE query, replacing the former
-    winner-query + ``source_data_by_resource_id`` pair (see
-    ``utils.resource_model_to_entity``). Rows are ordered
-    ``(default_priority, source, source_pk, colname)`` so grouping by source
-    yields sources best-priority-first, matching the old source ordering.
-
-    ``source_record`` repeats per value row -- bounded (one resource's handful of
-    sources), needed to rebuild the source entities, and dropped again by the
-    source *view*.
-
-    If the lazy field-source endpoint is later folded into the detail payload,
-    this is the query it would build on.
-    """
     base = construct_base_query_statement(licensed_sources, resource_ids=resource_ids)
     ranked = _ranked(base)
     s = OilGasFieldSourceModel
@@ -336,10 +240,6 @@ def coalesced_candidate_rows(
             s.source_record,
         )
         .join(s, s.id == ranked.c.source_pk)
-        # source_data grouping (utils._source_data_from_rows) relies on each
-        # source's rows being contiguous, so order by the source's global default
-        # priority -- per-field override_priority varies within a source and would
-        # fragment the grouping. rn (not this order) picks the per-field winner.
         .order_by(
             ranked.c.default_priority,
             ranked.c.source,
@@ -350,13 +250,6 @@ def coalesced_candidate_rows(
 
 
 def resource_universe() -> Select[tuple[int]]:
-    """Resources eligible to appear in a list: any non-repointed resource with an
-    active membership. Membership-derived and ungated by licensing/source, so a
-    resource whose licensed values are all absent still appears as a null-shell on
-    an unfiltered list (and drops out once a field is filtered).
-
-    Also decides which resources get rows in the resource-state read model
-    (``read_model.state``)."""
     m = MembershipModel
     r = ResourceModel
     return (
@@ -371,13 +264,6 @@ def resource_universe() -> Select[tuple[int]]:
 def resource_state_query(
     params: OGFieldQueryParams, permission_mask: int
 ) -> Select[tuple[int]]:
-    """The list's matching resource ids, in list order, for one profile.
-
-    Filters, sort, and id ordering use the shared clause builders (the same ones
-    the source list uses) on the stored typed columns of one permission profile
-    -- no coalescing window. The table only holds listable resources, so it is
-    the universe.
-    """
     state = OGFieldResourceState
     profile = _resource_state_profile(permission_mask)
     stmt = select(state.resource_id).where(state.permission_mask == permission_mask)
@@ -391,13 +277,6 @@ def resource_state_query(
 def resource_state_page_query(
     params: OGFieldQueryParams, permission_mask: int
 ) -> Select[Any]:
-    """One page of stored rows, chosen and read in a single statement.
-
-    The inner query picks the page's ids (``resource_state_query`` with the
-    page's limit/offset), which indexes can answer without touching skipped
-    rows; the outer query then reads just those rows, in the same order. Being
-    one statement, the page is chosen and read from one snapshot.
-    """
     state = OGFieldResourceState
     page = (
         resource_state_query(params, permission_mask)
@@ -412,11 +291,6 @@ def resource_state_page_query(
 
 
 def _resource_state_profile(permission_mask: int) -> Select[Any]:
-    """Every stored row for one profile.
-
-    Also the column source for the shared clause builders: its columns are the
-    table's own, so conditions and sorts apply straight to the indexed table.
-    """
     state = OGFieldResourceState
     return select(state.__table__).where(state.permission_mask == permission_mask)
 
@@ -424,7 +298,6 @@ def _resource_state_profile(permission_mask: int) -> Select[Any]:
 def resource_state_filter_option_query(
     field_name: str, permission_mask: int
 ) -> Select[tuple[str]]:
-    """Distinct non-null stored values of one filterable field for one profile."""
     state = OGFieldResourceState
     col = getattr(state, field_name)
     return (
@@ -441,12 +314,6 @@ def _add_pivot_columns(
     colname_col: ColumnElement[Any],
     value_col_for: Callable[[str], ColumnElement[Any]],
 ) -> Select:
-    """Add one ``max(case(colname == f, value))`` pivot column per field.
-
-    Shared by the source and resource base builders. ``value_col_for(field)``
-    returns the typed value column to pull (off the source value table or the
-    coalesced CTE); ``colname_col`` is the colname column on the same row.
-    """
     for field_name in fields:
         stmt = stmt.add_columns(
             func.max(
@@ -457,13 +324,6 @@ def _add_pivot_columns(
 
 
 def _require_column(cte: CTE | Select, field_name: str) -> ColumnElement[Any]:
-    """Return ``cte.c.<field_name>`` or raise if the narrowing dropped it.
-
-    Conditions and sort clauses are derived from the same
-    ``_participating_columns`` result as the pivot, so a missing column means
-    the narrowing drifted -- raise (per the repo convention) rather than
-    silently drop the filter/sort, which would return wrong rows.
-    """
     obj = cte.c if isinstance(cte, CTE) else cte.selected_columns
     col = getattr(obj, field_name, None)
     if col is None:
@@ -478,14 +338,6 @@ def _build_field_conditions(
     cte: CTE | Select,
     params: OGFieldQueryParams,
 ) -> list[ColumnElement[bool]]:
-    """Path-agnostic q-ILIKE + exact-match filters over the pivoted columns.
-
-    Shared by the source and resource paths: every condition references a
-    pivoted column via ``_require_column`` so a narrowing drift raises rather
-    than silently dropping a filter. The ``source`` membership filter and the
-    ``id`` identity filter are applied per-path by the base query builders;
-    licensing is applied upstream in ``construct_base_query_statement``.
-    """
     conditions: list[ColumnElement[bool]] = []
 
     if params.q:
@@ -498,8 +350,6 @@ def _build_field_conditions(
         values = _filter_values(params, field_name)
         if not values:
             continue
-        # IN over one value is the same predicate `== value` produced before, so
-        # single-valued filters are unchanged.
         conditions.append(_require_column(cte, field_name).in_(values))
 
     return conditions
@@ -511,8 +361,6 @@ def _build_sort_clauses(
     default: Literal["resource_id", "source_pk"] = "source_pk",
 ) -> list[Any]:
     direction = desc if params.sort_order == "desc" else asc
-    # id/resource_id are identity aliases for the path's own id column (source_pk
-    # on the source list, resource_id on the resource list).
     sort_by = default if params.sort_by in {"id", "resource_id"} else params.sort_by
     sort_col = _require_column(cte, sort_by)
 

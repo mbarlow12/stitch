@@ -98,8 +98,6 @@ def _source_payload() -> dict:
             RESOURCE_WRITE,
             {"ordered_source_pks": [1, 2]},
         ),
-        # Reordering also requires read access to every source, so holding all but
-        # one still 403s on the missing source-read permission.
         (
             "put",
             "/oil-gas-fields/1/fields/basin/sources/priority",
@@ -107,7 +105,6 @@ def _source_payload() -> dict:
             SOURCE_READ_GEM,
             {"ordered_source_pks": [1, 2]},
         ),
-        # create-and-attach requires BOTH source:write and resource:write
         (
             "post",
             "/oil-gas-fields/1/sources",

@@ -1,5 +1,3 @@
-"""Unit tests for auth module startup validation and token claims."""
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,7 +21,6 @@ from stitch.auth.settings import OIDCSettings
 def _make_settings(
     *, auth_disabled: bool = False, environment: str = "dev"
 ) -> Settings:
-    """Build a Settings instance with overridden fields."""
     return Settings(
         auth_disabled=auth_disabled,
         environment=environment,
@@ -40,10 +37,7 @@ def _make_oidc_settings(
 
 
 class TestValidateAuthConfigAtStartup:
-    """Unit tests for validate_auth_config_at_startup."""
-
     def test_allows_disabled_in_dev(self):
-        """No error when auth_disabled=True in DEV environment."""
         settings = _make_settings(auth_disabled=True, environment="development")
         with patch("stitch.api.auth.get_settings", return_value=settings):
             validate_auth_config_at_startup()
@@ -64,7 +58,6 @@ class TestValidateAuthConfigAtStartup:
             validate_auth_config_at_startup()
 
     def test_blocks_disabled_in_prod(self):
-        """RuntimeError when auth_disabled=True in PROD environment."""
         settings = _make_settings(auth_disabled=True, environment="production")
         with patch("stitch.api.auth.get_settings", return_value=settings):
             with pytest.raises(
@@ -74,7 +67,6 @@ class TestValidateAuthConfigAtStartup:
                 validate_auth_config_at_startup()
 
     def test_blocks_disabled_in_test(self):
-        """RuntimeError when auth_disabled=True in TEST environment."""
         settings = _make_settings(auth_disabled=True, environment="TEST")
         with patch("stitch.api.auth.get_settings", return_value=settings):
             with pytest.raises(
@@ -84,7 +76,6 @@ class TestValidateAuthConfigAtStartup:
                 validate_auth_config_at_startup()
 
     def test_validates_oidc_settings_when_enabled(self):
-        """Calls get_oidc_settings() when auth is enabled to fail fast."""
         settings = _make_settings(auth_disabled=False)
         with (
             patch("stitch.api.auth.get_settings", return_value=settings),
@@ -95,10 +86,7 @@ class TestValidateAuthConfigAtStartup:
 
 
 class TestGetTokenClaims:
-    """Unit tests for get_token_claims dependency."""
-
     def test_returns_dev_claims_when_disabled(self):
-        """Returns _DEV_CLAIMS when auth is disabled."""
         settings = _make_settings(auth_disabled=True, environment="development")
         oidc_settings = _make_oidc_settings()
 
@@ -112,7 +100,6 @@ class TestGetTokenClaims:
             assert response.status_code == 200
 
     def test_raises_401_missing_auth_header(self):
-        """401 when no Authorization header and auth is enabled."""
         settings = _make_settings(auth_disabled=False)
         oidc_settings = _make_oidc_settings()
 
@@ -129,7 +116,6 @@ class TestGetTokenClaims:
             assert response.json()["detail"] == "Missing Authorization header"
 
     def test_raises_401_invalid_header_format(self):
-        """401 for malformed Authorization header."""
         settings = _make_settings(auth_disabled=False)
         oidc_settings = _make_oidc_settings()
 
@@ -148,8 +134,6 @@ class TestGetTokenClaims:
 
 
 class TestRequirePermissions:
-    """Unit tests for the API permission dependency wrapper."""
-
     @pytest.mark.anyio
     async def test_default_check_requires_all_permissions(self):
         dependency = require_permissions(RESOURCE_READ, RESOURCE_WRITE)
@@ -212,8 +196,6 @@ class TestRequirePermissions:
 
 
 class TestAuthMeEndpoint:
-    """Route tests for /auth/me."""
-
     def test_returns_existing_user_and_claims(self):
         settings = _make_settings(auth_disabled=False)
         oidc_settings = _make_oidc_settings()

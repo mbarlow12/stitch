@@ -1,5 +1,3 @@
-"""Integration tests for POST /oil-gas-fields/{id}/sources (create + attach)."""
-
 from collections.abc import AsyncIterator
 
 import pytest
@@ -32,7 +30,6 @@ from tests.utils import make_source_model, make_source_record
 
 
 def _writer_claims() -> TokenClaims:
-    """Can create+attach sources and read the resulting resource/sources."""
     return TokenClaims(
         sub="test|user-1",
         email="test@test.com",
@@ -128,7 +125,6 @@ async def _seed_resource_with_source(
 async def _seed_repointed_resource(
     session_factory: async_sessionmaker[AsyncSession], user: User
 ) -> int:
-    """Create a resource that has been merged away (repointed elsewhere)."""
     async with session_factory() as session:
         canonical = ResourceModel.create(created_by=user)
         session.add(canonical)
@@ -143,7 +139,6 @@ async def _seed_repointed_resource(
 
 
 def _source_body(source: str = "rmi", **attrs) -> dict:
-    # `name` and `country` are required keys on OilGasFieldBase (nullable values).
     body = {
         "source": source,
         "name": None,
@@ -179,7 +174,6 @@ class TestCreateAndAttachSource:
         assert body["source"] == "rmi"
         assert body["name"] == "RMI Name"
 
-        # membership + source persisted
         async with integration_session_factory() as session:
             memberships = (
                 (
@@ -208,7 +202,6 @@ class TestCreateAndAttachSource:
         integration_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
     ):
-        # gem is lower priority than rmi, so the attached rmi value should win.
         resource_id = await _seed_resource_with_source(
             integration_session_factory,
             test_user,
@@ -233,8 +226,6 @@ class TestCreateAndAttachSource:
         integration_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
     ):
-        # llm is lower priority than rmi, so attaching an llm value must NOT
-        # displace the existing rmi winner.
         resource_id = await _seed_resource_with_source(
             integration_session_factory,
             test_user,
@@ -267,8 +258,6 @@ class TestCreateAndAttachSource:
         integration_session_factory: async_sessionmaker[AsyncSession],
         test_user: User,
     ):
-        # Attaching to a merged (repointed) resource would orphan the source,
-        # so it must be rejected without persisting anything.
         resource_id = await _seed_repointed_resource(
             integration_session_factory, test_user
         )
@@ -279,7 +268,6 @@ class TestCreateAndAttachSource:
         )
         assert response.status_code == 400
 
-        # no membership created and no source row leaked (rolled back)
         async with integration_session_factory() as session:
             memberships = (
                 (

@@ -1,14 +1,3 @@
-"""Smoke test for the service's shared-observability wiring.
-
-The tracing / logging / middleware setup lives in ``stitch.observability`` and is
-wired up in ``main.py``. This exercises that wiring end-to-end via the real app:
-booting it installs ``RequestContextMiddleware`` (added in ``register_middlewares``),
-so a request must come back with an ``X-Request-ID`` header and emit exactly one
-``stitch.observability.request`` summary log carrying the matched route. Tracing
-is disabled under the suite (conftest sets ``OTEL_TRACES_EXPORTER=none``); the
-request-id header and summary log are independent of tracing.
-"""
-
 from __future__ import annotations
 
 import logging

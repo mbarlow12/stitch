@@ -85,8 +85,6 @@ async def get_all_resources(
     )
 
 
-# Must stay above GET /{id}: Starlette matches routes in declaration order, so a
-# later static path would be swallowed by the id route.
 @router.get("/filter-options", response_model=OGFieldFilterOptionsResponse)
 async def get_resource_filter_options(
     *,
@@ -183,7 +181,6 @@ async def link_all_merge_candidates(
     claims: Claims,
     apply_merges: bool = True,
 ) -> LinkAllResponse:
-    """Queue every group of duplicate resources for review."""
     groups = await link_actions.match(
         session=uow.session,
         licensed_sources=licensed_sources(claims),
@@ -279,8 +276,6 @@ async def deny_merge_candidate(
 
 
 def _requested_resource_id(requested_id: int, resolved: OGFieldResource) -> int | None:
-    """The originally-requested id when the resolver returned a different resource
-    (i.e. the request was redirected through a merge); ``None`` otherwise."""
     return requested_id if resolved.id != requested_id else None
 
 
@@ -337,11 +332,6 @@ async def get_field_source_values(
     )
 
 
-# Reordering rewrites the whole per-field override set, so a curator who cannot
-# read every source could otherwise clobber rankings for sources they can't see.
-# Require read access to *all* sources (not just this resource's) on top of write
-# -- matching the curator role in Auth0 -- so the write always acts on a complete
-# picture. (Scoped to this endpoint for now; other write actions to follow.)
 @router.put(
     "/{id}/fields/{field}/sources/priority",
     response_model=list[OGFieldSourceValueView],
@@ -407,12 +397,6 @@ async def create_resource(
 async def create_and_attach_source(
     *, uow: UnitOfWorkDep, user: CurrentUser, id: int, source: OGFieldSource
 ) -> OGFieldSourceView:
-    """Create a new source and attach it to resource ``id`` in one step.
-
-    The source body must not carry an ``id`` (it is always created). Requires
-    both ``source:write`` (creating the source) and ``resource:write``
-    (managing the attachment).
-    """
     try:
         return await og_field_source_actions.create_and_attach_source(
             session=uow.session, user=user, source=source, resource_id=id

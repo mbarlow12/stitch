@@ -1,5 +1,3 @@
-"""Exact permission-profile matching for the resource-state read model."""
-
 from typing import get_args
 
 import pytest
@@ -16,12 +14,6 @@ from stitch.ogsi.model.types import OGSISrcKey
 
 
 def test_source_universe_is_exactly_public_plus_restricted():
-    """Adding a source key must be a deliberate change to the profiles.
-
-    A new key fails closed on its own (no grant that holds it equals a profile),
-    but every caller holding it would be refused. This test makes that gap
-    visible: decide whether the new key is public or restricted.
-    """
     assert frozenset(get_args(OGSISrcKey)) == PUBLIC_SOURCES | RESTRICTED_SOURCES
 
 
@@ -65,7 +57,6 @@ def test_empty_grant_matches_no_profile():
 @pytest.mark.parametrize("missing", sorted(PUBLIC_SOURCES))
 @pytest.mark.parametrize("restricted", [set(), {"wm"}, {"ccr"}, {"wm", "ccr"}])
 def test_partial_public_grant_matches_no_profile(missing: str, restricted: set[str]):
-    """Never round a partial public grant to a nearby profile."""
     sources = (PUBLIC_SOURCES - {missing}) | restricted
     assert read_model_mask(sources) is None
 

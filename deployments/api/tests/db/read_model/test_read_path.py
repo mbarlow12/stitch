@@ -1,5 +1,3 @@
-"""List and filter-options are served from the resource-state read model."""
-
 from __future__ import annotations
 
 import asyncio
@@ -35,8 +33,6 @@ class TestServedFromStoredState:
     async def test_list_reads_stored_rows_and_detail_coalesces_itself(
         self, seeded_integration_session: AsyncSession, rebuilt: Dataset
     ):
-        """Overwrite a stored value: the list reflects it (proving it reads the
-        table); the detail endpoint does not (it coalesces on every request)."""
         session = seeded_integration_session
         await session.execute(
             update(OGFieldResourceState)
@@ -67,8 +63,6 @@ class TestServedFromStoredState:
     async def test_internal_unscoped_calls_see_every_source(
         self, seeded_integration_session: AsyncSession, rebuilt: Dataset
     ):
-        """``None`` (only internal callers pass it) has always meant every
-        source; it reads the all-sources profile."""
         session = seeded_integration_session
         assert await _names(session, None) == await _names(session, PROFILES[3])
         assert await resource_actions.filter_options(
@@ -83,9 +77,6 @@ class TestValuesTodaysModelRejects:
         integration_session_factory: SessionFactory,
         test_user: User,
     ):
-        """A stored value can predate today's validation (e.g. a country code
-        that is no longer valid). Building rows doesn't validate it; a list page
-        does, so only a page that shows it fails."""
         session = seeded_integration_session
         good = await new_resource(session, test_user)
         await attach(session, test_user, good, "gem", name="Good", country="USA")
@@ -114,8 +105,6 @@ class TestReadsDuringARebuild:
         integration_session_factory: SessionFactory,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """The rebuild replaces each batch's rows in its own transaction and never
-        empties the table, so the API can keep serving while it runs."""
         session = seeded_integration_session
         expected = await _names(session, PROFILES[3])
         paused, resume = asyncio.Event(), asyncio.Event()

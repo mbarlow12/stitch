@@ -304,7 +304,6 @@ async def test_approve_merge_candidate_applies_merge_and_updates_candidate(
 
 @pytest.mark.anyio
 async def test_reroute_rewrites_pending_candidate_items_and_fingerprint(user):
-    # Approving A(18)+B(19) -> D(31) must repoint pending A(18)+C(20) to D+C.
     other = FakeCandidate(
         id=5,
         status=MergeCandidateStatus.PENDING,
@@ -328,8 +327,6 @@ async def test_reroute_rewrites_pending_candidate_items_and_fingerprint(user):
 
 @pytest.mark.anyio
 async def test_reroute_dedupes_when_candidate_holds_multiple_merged_ids(user):
-    # A 3-way A(18)+B(19)+C(20): approving A+B -> D(31) collapses both A and B to
-    # D, so the duplicate item is dropped and the candidate becomes D+C.
     other = FakeCandidate(
         id=5,
         status=MergeCandidateStatus.PENDING,
@@ -345,8 +342,6 @@ async def test_reroute_dedupes_when_candidate_holds_multiple_merged_ids(user):
         new_id=31,
     )
 
-    # The second merged-away member (position 1) is the dropped duplicate; it is
-    # removed from the collection (delete-orphan), not deleted through the session.
     assert [(i.resource_id, i.position) for i in other.items] == [(31, 0), (20, 2)]
     assert session.deleted == []
     assert other.fingerprint == "20:31"
@@ -354,9 +349,6 @@ async def test_reroute_dedupes_when_candidate_holds_multiple_merged_ids(user):
 
 @pytest.mark.anyio
 async def test_reroute_drops_candidate_that_collapses_below_two_members(user):
-    # Approving A(18)+B(19)+C(20) -> D(31) fully subsumes a pending A(18)+B(19):
-    # it would collapse to just [31], which can never be approved, so it is
-    # deleted rather than left as a dead end.
     subset = FakeCandidate(
         id=5,
         status=MergeCandidateStatus.PENDING,
@@ -373,13 +365,11 @@ async def test_reroute_drops_candidate_that_collapses_below_two_members(user):
     )
 
     assert session.deleted == [subset]
-    assert subset.fingerprint == "18:19"  # untouched; row is being deleted
+    assert subset.fingerprint == "18:19"
 
 
 @pytest.mark.anyio
 async def test_reroute_drops_duplicate_candidate_on_fingerprint_collision(user):
-    # A(18)+C(20) and B(19)+C(20) both collapse to D(31)+C(20). The lower-id
-    # candidate survives; the second is now the identical proposal and is deleted.
     ac = FakeCandidate(
         id=5,
         status=MergeCandidateStatus.PENDING,
@@ -468,8 +458,6 @@ def _values_for(compare, field):
 
 
 def test_build_comparison_status_is_match_or_different_per_resource():
-    # status compares the resources' coalesced values (resource_views); values
-    # list every contributing source, tagged with its resource_id.
     view_a = OilGasFieldBase(name="Ghawar", country="SAU", basin=None, region="R1")
     view_b = OilGasFieldBase(name="Burgan", country="SAU", basin=None, region=None)
     src_a = SimpleNamespace(source="rmi", id=10, name="Ghawar", country="SAU")
@@ -478,30 +466,20 @@ def test_build_comparison_status_is_match_or_different_per_resource():
 
     compare = mca._build_comparison([view_a, view_b], sources_with_priority)
 
-    # resources disagree
     assert _status_for(compare, "name") == "different"
-    # resources agree
     assert _status_for(compare, "country") == "match"
-    # both null -> agree
     assert _status_for(compare, "basin") == "match"
-    # one resource has a value, the other is null -> different
     assert _status_for(compare, "region") == "different"
 
-    # values are per-source (winner-first), tagged with the attached resource_id
     assert _values_for(compare, "name") == [
         (18, "rmi", 10, "Ghawar"),
         (19, "rmi", 11, "Burgan"),
     ]
 
-    # every OilGasFieldBase field is represented, once, in field order
     assert [c.field for c in compare] == list(OilGasFieldBase.model_fields)
 
 
 def test_build_comparison_matches_when_per_resource_winners_agree():
-    # Composite resource A resolves basin to "Foo" (its RMI winner), with a
-    # lower-priority GEM source "Bar" also in play. Resource B resolves basin to
-    # "Foo". Three sources in play, but both resources' *winners* agree -> match:
-    # status compares the resources' coalesced values, not every raw source.
     view_a = OilGasFieldBase(name=None, country="SAU", basin="Foo")
     view_b = OilGasFieldBase(name=None, country="SAU", basin="Foo")
     src_a_win = SimpleNamespace(source="rmi", id=10, basin="Foo")
@@ -512,7 +490,6 @@ def test_build_comparison_matches_when_per_resource_winners_agree():
     compare = mca._build_comparison([view_a, view_b], sources_with_priority)
 
     assert _status_for(compare, "basin") == "match"
-    # all three sources are listed (the losing "Bar" is not dropped), winner-first
     assert _values_for(compare, "basin") == [
         (18, "rmi", 10, "Foo"),
         (19, "rmi", 12, "Foo"),
@@ -521,9 +498,6 @@ def test_build_comparison_matches_when_per_resource_winners_agree():
 
 
 def test_build_comparison_keeps_present_values_and_matches_equal():
-    # Only None is dropped (unset); present values are kept and compared. Empty
-    # strings can't be persisted (write-path skip + DB CHECK), so they never
-    # reach here -- a null check is all `_build_comparison` needs.
     view_a = OilGasFieldBase(name=None, country="SAU", basin="Ghawar")
     view_b = OilGasFieldBase(name=None, country="SAU", basin="Ghawar")
     src_a = SimpleNamespace(source="rmi", id=10, basin="Ghawar")
@@ -554,7 +528,6 @@ async def test_get_merge_candidate_returns_detail_view_in_item_order(monkeypatch
         return candidate
 
     async def fake_coalesce(session_arg, resource_ids, licensed):
-        # ordered by item position
         assert resource_ids == [18, 19]
         assert licensed == ["gem"]
         return {
@@ -578,10 +551,8 @@ async def test_get_merge_candidate_returns_detail_view_in_item_order(monkeypatch
 
     assert isinstance(view, MergeCandidateDetailView)
     assert view.resource_ids == [18, 19]
-    # resources detail objects are gone; compare carries the per-source values
     assert not hasattr(view, "resources")
     assert [c.field for c in view.compare] == list(OilGasFieldBase.model_fields)
-    # each source value is tagged with the resource it is attached to
     name_values = next(c for c in view.compare if c.field == "name").values
     assert {(v.resource_id, v.value) for v in name_values} == {
         (18, "name-18"),
@@ -591,9 +562,6 @@ async def test_get_merge_candidate_returns_detail_view_in_item_order(monkeypatch
 
 @pytest.mark.anyio
 async def test_get_merge_candidate_after_merge_yields_empty_compare(monkeypatch):
-    # Live behavior for an APPROVED candidate: originals are repointed with
-    # memberships INACTIVE, so coalesce_resources returns null-shell views with
-    # no surviving source data.
     candidate = FakeCandidate(
         id=2,
         status=MergeCandidateStatus.APPROVED,
@@ -622,6 +590,5 @@ async def test_get_merge_candidate_after_merge_yields_empty_compare(monkeypatch)
     view = await mca.get_merge_candidate(AsyncMock(), candidate_id=2)
 
     assert view.merged_resource_id == 31
-    # every resource is null on every field -> they all agree (match), no values
     assert all(c.status == "match" for c in view.compare)
     assert all(c.values == [] for c in view.compare)

@@ -1,5 +1,3 @@
-"""Fixtures shared by the read-model tests."""
-
 import uuid
 from collections.abc import AsyncIterator
 
@@ -18,7 +16,6 @@ from .postgres import POSTGRES_URL
 
 @pytest.fixture
 async def dataset(seeded_integration_session: AsyncSession, test_user: User) -> Dataset:
-    """The seeded dataset, with an empty (never rebuilt) read model."""
     return await seed_dataset(seeded_integration_session, test_user)
 
 
@@ -27,7 +24,6 @@ async def rebuilt(
     dataset: Dataset,
     integration_session_factory: async_sessionmaker[AsyncSession],
 ) -> Dataset:
-    """The seeded dataset after a full rebuild."""
     await rebuild_all_resource_state(integration_session_factory)
     return dataset
 
@@ -36,10 +32,6 @@ async def rebuilt(
 async def pg_session_factory(
     test_user_model: UserModel,
 ) -> AsyncIterator[async_sessionmaker[AsyncSession]]:
-    """Sessions on the opt-in Postgres, in a schema of their own (see ``postgres.py``).
-
-    Only for tests marked ``requires_postgres``.
-    """
     assert POSTGRES_URL is not None, "mark the test with requires_postgres"
     schema = f"stit766_test_{uuid.uuid4().hex[:8]}"
     admin = create_async_engine(POSTGRES_URL)

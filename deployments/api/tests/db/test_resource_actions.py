@@ -1,5 +1,3 @@
-"""Database integration tests for domain-agnostic resource_actions."""
-
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import event, func, select
@@ -32,9 +30,6 @@ from tests.utils import make_source_model
 
 _QueryParams = OGFieldQueryParams
 
-# Callers hold exactly one of the read model's profiles: every public source,
-# plus any of the restricted ones (wm, ccr). Licensing tests hide a restricted
-# source by leaving it out.
 _PUBLIC = PROFILES[0]
 _PUBLIC_AND_WM = PROFILES[2]
 
@@ -69,14 +64,11 @@ async def _create_resource_with_sources(
         )
 
     await session.flush()
-    # Seeded directly, not through a write action: bring the read model the
-    # list reads from up to date, as the write actions do.
     await refresh_resource_states(session, [resource.id])
     return resource.id
 
 
 async def _add_source(session, user, rid: int, **attrs) -> int:
-    """Attach one active source record (with values) to an existing resource."""
     source = make_source_model(
         source=attrs.pop("source"), created_by_id=user.id, **attrs
     )
@@ -97,7 +89,6 @@ async def _add_source(session, user, rid: int, **attrs) -> int:
 
 
 async def _source_pks(session, rid: int, source_key: str) -> list[int]:
-    """Active source-record ids for one source of a resource, ascending by id."""
     stmt = (
         select(MembershipModel.source_pk)
         .where(
@@ -112,7 +103,6 @@ async def _source_pks(session, rid: int, source_key: str) -> list[int]:
 async def _override(
     session, user, rid: int, source_key: str, field: str, priority: int
 ):
-    """Insert one per-field override row for the (single) record of a source."""
     (pk,) = await _source_pks(session, rid, source_key)
     session.add(
         OGFieldResourceSourcePriority.create(
@@ -130,8 +120,6 @@ async def _override(
 
 
 class TestCreateResourceActionIntegration:
-    """Integration tests for resource_actions.create() with real database."""
-
     @pytest.mark.anyio
     async def test_creates_resource_with_minimal_payload(
         self,
@@ -173,13 +161,10 @@ class TestCreateResourceActionIntegration:
 
         db_resource = await seeded_integration_session.get(ResourceModel, result.id)
         assert db_resource is not None
-        # DB ResourceModel may store `.name`; tolerate either while refactor settles.
         assert getattr(db_resource, "name", None) in (None, "Test Label")
 
 
 class TestGetResourceActionIntegration:
-    """Integration tests for resource_actions.get() with real database."""
-
     @pytest.mark.anyio
     async def test_get_returns_resource(
         self,
@@ -217,18 +202,12 @@ class TestGetResourceActionIntegration:
 
 
 class TestGetResolvedResourceAction:
-    """resource_actions.get_resolved() follows repoints to the terminal resource."""
-
     @pytest.mark.anyio
     async def test_resolves_multi_hop_chain_to_root(
         self,
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        # Build the chain root-first so each repointed_to target already exists:
-        # A -> C -> F -> J, each a distinct row carrying its own data. Only J is
-        # a root (repointed_to is None). Three hops, not two: a 2-hop chain can
-        # pass an implementation that only handles one extra level.
         session = seeded_integration_session
         j = await _create_resource_with_sources(
             session, test_user, {"source": "gem", "name": "Root J", "country": "USA"}
@@ -252,7 +231,6 @@ class TestGetResolvedResourceAction:
             repointed_to=c,
         )
 
-        # Every non-root id in the chain resolves to J with J's real data.
         for origin in (a, c, f):
             resolved = await resource_actions.get_resolved(session, origin)
             assert resolved.id == j
@@ -294,9 +272,6 @@ class TestGetResolvedResourceAction:
         test_user: User,
         monkeypatch,
     ):
-        # Defensive: an unresolvable repoint chain (corrupt data, impossible under
-        # current invariants) must surface as a 404, not an unhandled
-        # ResourceNotFoundError that FastAPI turns into a 500.
         session = seeded_integration_session
         root_id = await _create_resource_with_sources(
             session, test_user, {"source": "gem", "name": "Root", "country": "USA"}
@@ -319,8 +294,6 @@ class TestGetResolvedResourceAction:
 
 
 class TestResourceQueryAction:
-    """Integration tests for resource_actions.query() and count()."""
-
     @pytest.fixture
     async def seeded_resources(
         self,
@@ -328,7 +301,6 @@ class TestResourceQueryAction:
         test_user: User,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        """Create 3 resources for query tests."""
         for name in ["Alpha", "Bravo", "Charlie"]:
             await resource_actions.create(
                 session=seeded_integration_session,
@@ -375,7 +347,6 @@ class TestResourceQueryAction:
         seeded_integration_session: AsyncSession,
         seeded_resources,
     ):
-        """List items include coalesced data and provenance dict."""
         params = _QueryParams(page=1, page_size=10)
         items, _ = await resource_actions.query(seeded_integration_session, params)
         assert len(items) > 0
@@ -390,12 +361,6 @@ class TestResourceQueryAction:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """``params.source`` is ignored: resources are not source-gated.
-
-        The universe is membership-derived (only licensing narrows it), so a
-        ``source=['gem']`` filter does not exclude resources lacking a gem
-        membership, and coalescing still resolves the full-priority winner.
-        """
         included_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -411,11 +376,9 @@ class TestResourceQueryAction:
         params = _QueryParams(source=["gem"], page=1, page_size=10)
         items, total = await resource_actions.query(seeded_integration_session, params)
 
-        # Both resources appear -- source is not a resource-level filter.
         assert total == 2
         assert {item.id for item in items} == {included_id, only_rmi_id}
 
-        # The rmi+gem resource still coalesces the rmi-priority winner.
         included = next(item for item in items if item.id == included_id)
         assert included.data.name == "RMI Name"
         assert included.provenance["name"] == "rmi"
@@ -465,9 +428,6 @@ class TestResourceQueryAction:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        # Highest-priority source (rmi) supplies an empty-string basin. It is
-        # dropped on write (empty == unset), so it never becomes a value row and
-        # coalescing falls through to the lower-priority non-empty value.
         resource_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -487,8 +447,6 @@ class TestResourceQueryAction:
         assert items[0].data.basin == "GEM Basin"
         assert items[0].provenance["basin"] == "gem"
 
-        # The empty value was never persisted, so the all-sources view lists
-        # only gem and its winner-first order agrees with the coalesced winner.
         values = await resource_actions.field_source_values(
             seeded_integration_session, resource_id, "basin"
         )
@@ -500,8 +458,6 @@ class TestResourceQueryAction:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        # Defense in depth: even if a caller bypasses the write-path skip, the
-        # DB refuses to persist an empty-string value row.
         source = make_source_model(
             source="rmi", created_by_id=test_user.id, name="RMI Name"
         )
@@ -639,7 +595,6 @@ class TestResourceQueryAction:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """``licensed_sources=None`` must be a no-op preserving every membership."""
         resource_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -729,15 +684,12 @@ class TestResourceQueryAction:
 
 
 class TestResourceUniverseAndNarrowing:
-    """Membership-derived universe, source-ignoring, and pivot-narrowing proofs."""
-
     @pytest.mark.anyio
     async def test_source_param_ignored_across_multiple_keys(
         self,
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """``params.source`` never narrows the resource universe, any key(s)."""
         gem_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -754,13 +706,11 @@ class TestResourceUniverseAndNarrowing:
             {"source": "rmi", "name": "RMI", "country": "USA"},
         )
 
-        # A source filter naming a key none of them have still returns all three.
         params = _QueryParams(source=["llm"], page=1, page_size=10)
         items, total = await resource_actions.query(seeded_integration_session, params)
         assert total == 3
         assert {item.id for item in items} == {gem_id, wm_id, rmi_id}
 
-        # An explicit subset is equally ignored.
         params = _QueryParams(source=["gem"], page=1, page_size=10)
         _, total = await resource_actions.query(seeded_integration_session, params)
         assert total == 3
@@ -771,11 +721,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """A resource whose only source has all-null attributes still appears.
-
-        It emits zero coalesced rows but is membership-derived, so it is counted
-        and hydrated as a null-shell.
-        """
         resource_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -797,7 +742,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """basin filter proves basin is pivoted and filtered on coalesced values."""
         permian_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -822,7 +766,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """Several values for one filter are OR'd, not silently narrowed to one."""
         nor_id = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -851,7 +794,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """An empty list means "no filter", never "match nothing" (IN () matches none)."""
         await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -869,7 +811,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """discovery_year sorts numerically (from value_num) with NULLs last."""
         y2000 = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -901,7 +842,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """sort_by=id, no q/filters: no pivot at all, all active resources by id."""
         ids = [
             await _create_resource_with_sources(
                 seeded_integration_session,
@@ -923,7 +863,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """On resources, both id and resource_id are real id-sorts with direction."""
         ids = [
             await _create_resource_with_sources(
                 seeded_integration_session,
@@ -958,7 +897,6 @@ class TestResourceUniverseAndNarrowing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """query hydrates in constant round-trips, independent of page size (no N+1)."""
         for name in ["A", "B", "C", "D"]:
             await _create_resource_with_sources(
                 seeded_integration_session,
@@ -987,16 +925,12 @@ class TestResourceUniverseAndNarrowing:
         one_count, _ = await _count(1)
         all_count, all_items = await _count(10)
 
-        # No N+1: a 4-row page costs the same round-trips as a 1-row page.
         assert one_count == all_count
-        # Small constant: ids + count + source/priority join + selectin values.
         assert all_count <= 5
         assert len(all_items) == 4
 
 
 class TestResourceFilterOptionsAction:
-    """Integration tests for resource_actions.filter_options()."""
-
     @pytest.mark.anyio
     async def test_returns_distinct_sorted_coalesced_values(
         self,
@@ -1061,9 +995,6 @@ class TestResourceFilterOptionsAction:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """Dropping the winning source's license promotes the runner-up value,
-        rather than blanking the field.
-        """
         await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -1334,10 +1265,7 @@ class TestResourceFilterOptionsAction:
 
 
 class TestResourcePriorityOverride:
-    """A per-field override re-ranks sources, flipping the coalesced winner."""
-
     async def _seed(self, session, user) -> int:
-        # Default priority: wm(2) outranks gem(6), so wm wins by default.
         return await _create_resource_with_sources(
             session,
             user,
@@ -1354,24 +1282,18 @@ class TestResourcePriorityOverride:
         session = seeded_integration_session
         rid = await self._seed(session, test_user)
 
-        # Default: wm wins.
         before = await resource_actions.get(session, rid)
         assert before.view.name == "WM Name"
         assert before.provenance["name"][1] == "wm"
 
-        # Override gem to top priority for the NAME field of THIS resource only.
         await _override(session, test_user, rid, "gem", "name", priority=0)
 
-        # Detail path reflects the override on name (value + provenance)...
         after = await resource_actions.get(session, rid)
         assert after.view.name == "GEM Name"
         assert after.provenance["name"][1] == "gem"
-        # ...but country is a different field with no override, so it still
-        # coalesces to wm -- overrides are per-field.
         assert after.view.country == "CAN"
         assert after.provenance["country"][1] == "wm"
 
-        # List path reflects it too.
         items, _ = await resource_actions.query(session, _QueryParams())
         item = next(i for i in items if i.id == rid)
         assert item.data.name == "GEM Name"
@@ -1390,15 +1312,11 @@ class TestResourcePriorityOverride:
         await _override(session, test_user, overridden, "gem", "name", priority=0)
 
         assert (await resource_actions.get(session, overridden)).view.name == "GEM Name"
-        # The other resource keeps the default ranking.
         assert (await resource_actions.get(session, untouched)).view.name == "WM Name"
 
 
 class TestFieldSourceValues:
-    """Per-field source-value listing, best-priority first."""
-
     async def _seed(self, session, user) -> int:
-        # wm(2) outranks gem(6) by default; llm has no state_province.
         return await _create_resource_with_sources(
             session,
             user,
@@ -1418,7 +1336,6 @@ class TestFieldSourceValues:
 
         rows = await resource_actions.field_source_values(session, rid, "name")
 
-        # wm(2) < gem(6) < llm(7): winner (wm) first, then in priority order.
         assert [(r.source, r.value) for r in rows] == [
             ("wm", "WM Name"),
             ("gem", "GEM Name"),
@@ -1438,14 +1355,11 @@ class TestFieldSourceValues:
 
         rows = await resource_actions.field_source_values(session, rid, "basin")
 
-        # gem promoted above wm; llm has no basin so it is omitted.
         assert [(r.source, r.value) for r in rows] == [
             ("gem", "Alpha"),
             ("wm", "Beta"),
         ]
-        # The curated row is flagged; the untouched one is not.
         assert [r.is_override for r in rows] == [True, False]
-        # Priority is the 0-based rank position, winner first.
         assert [r.priority for r in rows] == [0, 1]
 
     @pytest.mark.anyio
@@ -1509,8 +1423,6 @@ class TestFieldSourceValues:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        # STIT-418: a merged-away id returns the terminal resource's field
-        # sources, matching the redirect on the single-resource read endpoints.
         session = seeded_integration_session
         root_id = await self._seed(session, test_user)
         old_id = await _create_resource_with_sources(
@@ -1526,15 +1438,11 @@ class TestFieldSourceValues:
         assert [(r.source, r.value) for r in via_old] == [
             (r.source, r.value) for r in via_root
         ]
-        # It resolves to the root's data, not the old shell's.
         assert ("wm", "WM Name") in [(r.source, r.value) for r in via_old]
 
 
 class TestSetFieldSourcePriority:
-    """Write path: persist and enforce a curator's per-field source ordering."""
-
     async def _seed(self, session, user) -> int:
-        # wm(2) wins name & basin by default; gem(4) is second.
         return await _create_resource_with_sources(
             session,
             user,
@@ -1555,20 +1463,17 @@ class TestSetFieldSourcePriority:
             session, test_user, rid, "name", [gem_pk, wm_pk]
         )
 
-        # Returned ranking is winner-first and flags the curated rows.
         assert [(r.source, r.source_id) for r in result] == [
             ("gem", gem_pk),
             ("wm", wm_pk),
         ]
         assert all(r.is_override for r in result)
 
-        # Detail and list agree on the new coalesced winner.
         detail = await resource_actions.get(session, rid)
         assert detail.view.name == "GEM Name"
         items, _ = await resource_actions.query(session, _QueryParams())
         assert next(i for i in items if i.id == rid).data.name == "GEM Name"
 
-        # basin was not curated -> still wm by default (per-field isolation).
         assert detail.view.basin == "Beta"
 
     @pytest.mark.anyio
@@ -1580,7 +1485,6 @@ class TestSetFieldSourcePriority:
         (gem_pk,) = await _source_pks(session, rid, "gem")
         (wm_pk,) = await _source_pks(session, rid, "wm")
 
-        # wm, gem is already the default order -> no-op, no rows written.
         await resource_actions.set_field_source_priority(
             session, test_user, rid, "name", [wm_pk, gem_pk]
         )
@@ -1610,7 +1514,6 @@ class TestSetFieldSourcePriority:
         rid = await self._seed(session, test_user)
         (wm_pk,) = await _source_pks(session, rid, "wm")
         with pytest.raises(InvalidActionError):
-            # gem omitted.
             await resource_actions.set_field_source_priority(
                 session, test_user, rid, "name", [wm_pk]
             )
@@ -1671,9 +1574,6 @@ class TestSetFieldSourcePriority:
     async def test_rejects_reorder_without_read_access_to_all_sources(
         self, seeded_integration_session: AsyncSession, test_user: User
     ):
-        # Reordering rewrites the field's whole override set, so a caller not
-        # licensed to read every source must be refused -- defense-in-depth behind
-        # the route's all-source-read requirement.
         session = seeded_integration_session
         rid = await self._seed(session, test_user)
         (gem_pk,) = await _source_pks(session, rid, "gem")
@@ -1685,7 +1585,7 @@ class TestSetFieldSourcePriority:
                 rid,
                 "name",
                 [gem_pk, wm_pk],
-                licensed_sources={"gem", "wm"},  # not the full source set
+                licensed_sources={"gem", "wm"},
             )
 
     @pytest.mark.anyio
@@ -1701,9 +1601,6 @@ class TestSetFieldSourcePriority:
             session, test_user, rid, "name", [gem_pk, wm_pk]
         )
 
-        # A source added AFTER curation has no override row for the field, so it
-        # lands in the default tier and ranks last -- even though rmi has the best
-        # global default priority (1).
         rmi_pk = await _add_source(
             session, test_user, rid, source="rmi", name="RMI Name"
         )
@@ -1714,30 +1611,16 @@ class TestSetFieldSourcePriority:
             ("wm", wm_pk),
             ("rmi", rmi_pk),
         ]
-        # The coalesced winner is still the curated gem, not the newer rmi.
         assert (await resource_actions.get(session, rid)).view.name == "GEM Name"
 
 
 class TestResourceDetailCoalescing:
-    """Detail-path (``resource_actions.get``) coalescing behavior.
-
-    Characterizes the per-resource detail contract so it survives the move from
-    the SQL window-function CTE to in-memory coalescing over already-loaded
-    source data. Provenance on the detail path is the ``(value, source,
-    source_pk)`` tuple shape.
-    """
-
     @pytest.mark.anyio
     async def test_duplicate_same_source_records_lowest_source_pk_wins(
         self,
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """Two active records of the same source: the lowest source_pk wins.
-
-        Both rmi records share priority and source key, so the tiebreak is the
-        source_pk; the first-created (lower id) record is the winner.
-        """
         session = seeded_integration_session
         rid = await _create_resource_with_sources(
             session,
@@ -1759,11 +1642,6 @@ class TestResourceDetailCoalescing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """A repointed resource coalesces to a null-shell, repointed_to populated.
-
-        Even with an active membership carrying values, a repointed resource
-        contributes no coalesced values; ``repointed_to`` carries its target.
-        """
         session = seeded_integration_session
         root_id = await _create_resource_with_sources(
             session,
@@ -1791,11 +1669,6 @@ class TestResourceDetailCoalescing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """An unlicensed higher-priority source falls through to the next licensed.
-
-        rmi outranks gem by default, but licensing only gem/wm/llm drops rmi, so
-        the gem value wins in the detail view and provenance.
-        """
         session = seeded_integration_session
         rid = await _create_resource_with_sources(
             session,
@@ -1817,7 +1690,6 @@ class TestResourceDetailCoalescing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """JSON owners/operators materialize in the detail view with provenance."""
         session = seeded_integration_session
         rid = await _create_resource_with_sources(
             session,
@@ -1855,12 +1727,6 @@ class TestResourceDetailCoalescing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """Detail builds the winner view *and* raw source_data from one query.
-
-        Both projections come from the same ranked-candidate rows: the winner
-        view/provenance (rn == 1) and source_data (all rows, grouped by source,
-        best-priority first). Each source keeps its own per-field values.
-        """
         session = seeded_integration_session
         rid = await _create_resource_with_sources(
             session,
@@ -1871,13 +1737,11 @@ class TestResourceDetailCoalescing:
 
         result = await resource_actions.get(session, rid)
 
-        # Winner view: rmi outranks gem for shared fields; gem fills basin.
         assert result.view.name == "RMI Name"
         assert result.view.country == "USA"
         assert result.view.basin == "GEM Basin"
         assert result.provenance["basin"][1] == "gem"
 
-        # source_data: both sources, best-priority first, each with its own values.
         assert [s.source for s in result.source_data] == ["rmi", "gem"]
         by_source = {s.source: s for s in result.source_data}
         assert by_source["rmi"].name == "RMI Name"
@@ -1891,12 +1755,6 @@ class TestResourceDetailCoalescing:
         seeded_integration_session: AsyncSession,
         test_user: User,
     ):
-        """get() costs a fixed number of round-trips regardless of source count.
-
-        The view + source_data come from a single ranked query (no separate
-        source-listing query, no per-source N+1), so a 4-source resource costs
-        the same as a 1-source one.
-        """
         one = await _create_resource_with_sources(
             seeded_integration_session,
             test_user,
@@ -1930,8 +1788,6 @@ class TestResourceDetailCoalescing:
 
 
 class TestBatchedSourceData:
-    """ResourceModel.source_data_by_resource_id groups + licensed-filters."""
-
     @pytest.mark.anyio
     async def test_groups_by_resource_and_filters_licensed(
         self,
@@ -1967,13 +1823,6 @@ class TestBatchedSourceData:
 
 
 class TestCoalescingEngineParity:
-    """The list (read model) and the detail view pick the same winner.
-
-    Exercises all three tiebreak paths at once: an unlicensed higher-priority
-    source (dropped), a per-resource priority override, and duplicate
-    same-source records (lowest source_pk wins).
-    """
-
     @pytest.mark.anyio
     async def test_list_and_detail_agree_on_coalesced_winner(
         self,
@@ -1989,8 +1838,6 @@ class TestCoalescingEngineParity:
             {"source": "wm", "name": "WM Second", "country": "CAN"},
             {"source": "gem", "name": "GEM Name", "country": "BRA"},
         )
-        # Overrides for the NAME field: ccr first (it would win if licensed),
-        # then both wm records in source_pk order (WM First < WM Second).
         (ccr_pk,) = await _source_pks(session, rid, "ccr")
         for priority, (source, pk) in enumerate(
             [("ccr", ccr_pk)]
@@ -2009,18 +1856,12 @@ class TestCoalescingEngineParity:
         await session.flush()
         await refresh_resource_states(session, [rid])
 
-        # ccr unlicensed -> falls through; among licensed sources the wm
-        # override wins, and the lowest source_pk among the duplicate wm
-        # records wins.
         licensed = _PUBLIC_AND_WM
 
-        # Detail (Python) winner.
         detail = await resource_actions.get(session, rid, licensed_sources=licensed)
         assert detail.view.name == "WM First"
         assert detail.provenance["name"][1] == "wm"
 
-        # List (read model): filtering on the detail winner's coalesced name must
-        # return the resource, with the same value + provenance.
         params = _QueryParams(name=detail.view.name, page=1, page_size=10)
         items, total = await resource_actions.query(
             session, params, licensed_sources=licensed
@@ -2032,13 +1873,10 @@ class TestCoalescingEngineParity:
 
 
 class TestMembershipUniqueness:
-    """(resource_id, source_pk) is unique; merge collapses a shared source."""
-
     @staticmethod
     async def _resources_sharing_one_source(
         session: AsyncSession, user: User
     ) -> tuple[int, int, int]:
-        """Two resources, each with a membership on the same source record."""
         rid_a = await _create_resource_with_sources(session, user)
         rid_b = await _create_resource_with_sources(session, user)
         source = make_source_model(
@@ -2046,7 +1884,6 @@ class TestMembershipUniqueness:
         )
         session.add(source)
         await session.flush()
-        # A source may belong to several different resources.
         for rid in (rid_a, rid_b):
             session.add(
                 MembershipModel.create(
@@ -2112,7 +1949,6 @@ class TestMembershipUniqueness:
     ):
         session = seeded_integration_session
         rid_a, rid_b, pk = await self._resources_sharing_one_source(session, test_user)
-        # The earlier (lower id) membership is inactive, the later one active.
         [first] = await self._memberships(session, rid_a, pk)
         first.status = MembershipStatus.INACTIVE
         await session.flush()

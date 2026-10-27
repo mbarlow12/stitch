@@ -1,5 +1,3 @@
-"""Tests for the SQLAlchemy query timing listener."""
-
 import logging
 import sys
 
@@ -19,7 +17,6 @@ from stitch.observability import JsonFormatter, configure_logging
 
 @pytest.fixture
 async def timed_engine(monkeypatch):
-    """Async SQLite engine with timing registered and emitted events captured."""
     captured: list[dict] = []
     monkeypatch.setattr(
         query_timing, "emit_query_event", lambda event: captured.append(event)
@@ -80,8 +77,6 @@ class TestQueryTiming:
             await conn.execute(text("SELECT 1"))
 
         assert len(captured) == 1
-        # Field is omitted entirely for unlabeled queries so existing log
-        # consumers see no new key.
         assert "query_name" not in captured[0]
 
     @pytest.mark.anyio
@@ -103,7 +98,6 @@ class TestQueryTiming:
             query_timing, "emit_query_event", lambda event: captured.append(event)
         )
         engine = create_async_engine("sqlite+aiosqlite:///:memory:")
-        # Very high threshold and not logging all: trivial query is not emitted.
         query_timing.register_query_timing(
             engine.sync_engine, slow_query_ms=10_000, log_all_queries=False
         )
@@ -116,9 +110,6 @@ class TestQueryTiming:
         assert captured == []
 
     def test_failed_query_does_not_leak_start_time(self, monkeypatch):
-        # A statement that raises skips after_cursor_execute; the handle_error
-        # listener must pop the start time the before-hook pushed, or it leaks
-        # on the connection. Tested on a sync engine for direct conn.info access.
         captured: list[dict] = []
         monkeypatch.setattr(
             query_timing, "emit_query_event", lambda event: captured.append(event)
@@ -131,9 +122,9 @@ class TestQueryTiming:
             with engine.connect() as conn:
                 with pytest.raises(Exception):
                     conn.execute(text("SELECT * FROM does_not_exist"))
-                assert not conn.info.get(_START_KEY)  # popped by handle_error
+                assert not conn.info.get(_START_KEY)
                 conn.execute(text("SELECT 1"))
-                assert not conn.info.get(_START_KEY)  # no residual leak
+                assert not conn.info.get(_START_KEY)
         finally:
             engine.dispose()
 

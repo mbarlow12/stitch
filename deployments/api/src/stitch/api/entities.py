@@ -25,11 +25,6 @@ class Timestamped(BaseModel):
     updated: datetime = Field(default_factory=datetime.now)
 
 
-# The sources will come in and be initially stored in a raw table.
-# That raw table will be an append-only table.
-# We'll translate that data into one of the below structures, so each source will have a `UUID` or similar that
-# references their id in the "raw" table.
-# When pulling into the internal "sources" table, each will get a new unique id which is what the memberships will reference
 
 
 class User(BaseModel):
@@ -100,13 +95,6 @@ SortableField = Literal[
 
 
 class OGFieldFilterParams(BaseModel):
-    """Exact-match filters for the resource list.
-
-    The fields the UI offers as multi-select dropdowns take a list: repeat the
-    param once per value (``?country=NOR&country=SAU``) to match any of them.
-    A single value still works and arrives as a one-item list, so existing
-    callers and bookmarked URLs are unaffected.
-    """
 
     q: str | None = None
     id: int | None = None
@@ -132,7 +120,6 @@ class OGFieldQueryParams(PaginationParams, OGFieldFilterParams, OGFieldSortParam
 
 
 class OGFieldFilterOptionsResponse(BaseModel):
-    """Every filterable field's distinct coalesced values, one list per field."""
 
     basin: list[str]
     country: list[str]
@@ -167,12 +154,6 @@ class MergeCandidateReviewRequest(BaseModel):
 
 
 class SetFieldPriorityRequest(BaseModel):
-    """New source ordering for one field, best-first.
-
-    ``ordered_source_pks`` must list *exactly* the source records that currently
-    carry a value for the field (same set the read endpoint returns), each once.
-    Index 0 becomes the coalesced winner.
-    """
 
     ordered_source_pks: list[int]
 
@@ -192,43 +173,11 @@ class MergeCandidateView(BaseModel):
 
 
 class ComparisonValueView(OGFieldSourceValueView):
-    """A source's value in a merge comparison, tagged with ``resource_id`` --
-    the candidate resource the source is currently attached to.
-
-    ``priority`` here is the *default global* source order -- the order the
-    merged resource will use, since a merge drops per-resource priority
-    overrides -- not the effective per-resource ranking. So the winner-ordering
-    of these values can differ from ``FieldComparisonView.status`` (each
-    resource's current effective coalesced value) whenever a per-resource
-    override is active. That divergence is expected: ``values`` predicts the
-    post-merge winner, ``status`` describes the current state.
-    """
 
     resource_id: int
 
 
 class FieldComparisonView(BaseModel):
-    """One field compared across a merge candidate's resources.
-
-    ``values`` lists every source (across all candidate resources) that carries a
-    value for the field, winner-first (lowest ``priority`` wins). Each entry
-    carries the ``resource_id`` it is attached to, so the client can group values
-    by resource without a separate per-resource payload.
-
-    ``status`` compares the resources' coalesced values for the field:
-
-    - ``match`` -- every resource resolves to the same value (all equal,
-      including the case where every resource is null).
-    - ``different`` -- the resources disagree, including when one resource has a
-      value and another is null.
-
-    Equality is Python ``==``, which errs toward ``different`` (exact float
-    equality; ordered ``owners``/``operators`` comparison).
-
-    NOTE: ``values`` (and the derived ``status``) are a best guess at what the
-    merge will persist -- overrides are dropped on merge, so the merged resource
-    can resolve to a value that differs from any single parent's current winner.
-    """
 
     field: str
     status: Literal["match", "different"]

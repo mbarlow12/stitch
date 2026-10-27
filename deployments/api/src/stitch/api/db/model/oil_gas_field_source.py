@@ -16,11 +16,6 @@ from .oil_gas_field_source_value import ATTRIBUTE_NAMES, OilGasFieldSourceValueM
 
 
 class OilGasFieldSourceModel(TimestampMixin, UserAuditMixin, Base):
-    """Header for a single OG field source record.
-
-    Identity + raw payload only; the coalesced attributes live in long form on
-    ``oil_gas_field_source_values`` (``values`` relationship).
-    """
 
     type_adapter: ClassVar[TypeAdapter[OGFieldSource]] = TypeAdapter(OGFieldSource)
 
@@ -30,13 +25,10 @@ class OilGasFieldSourceModel(TimestampMixin, UserAuditMixin, Base):
         PORTABLE_BIGINT, primary_key=True, autoincrement=True
     )
 
-    # SqlAlchemy will translate the Literal type into an Enum.
     source: Mapped[OGSISrcKey] = mapped_column(nullable=False)
 
-    # Raw, non-coalesced original payload.
     source_record: Mapped[dict[str, Any]] = mapped_column(StitchJson, nullable=False)
 
-    # Long-form coalesced attributes; eager-loaded so as_entity() stays sync.
     values: Mapped[list[OilGasFieldSourceValueModel]] = relationship(
         cascade="all, delete-orphan",
         lazy="selectin",
@@ -61,9 +53,6 @@ class OilGasFieldSourceModel(TimestampMixin, UserAuditMixin, Base):
             kwargs["created_by_id"] = created_by_id
             kwargs["last_updated_by_id"] = created_by_id
         header = cls(**kwargs)
-        # Absent and empty-string attributes are both "unset": no value row is
-        # written (empty strings are dropped here, not persisted and filtered
-        # out later). The raw payload survives verbatim on ``source_record``.
         header.values = [
             OilGasFieldSourceValueModel.from_attribute(colname, value)
             for colname in ATTRIBUTE_NAMES
@@ -72,7 +61,6 @@ class OilGasFieldSourceModel(TimestampMixin, UserAuditMixin, Base):
         return header
 
     def as_entity(self) -> OGFieldSource:
-        # Materialize absent attributes as None (the long table is dense).
         data: dict[str, Any] = {colname: None for colname in ATTRIBUTE_NAMES}
         data.update(
             id=self.id,

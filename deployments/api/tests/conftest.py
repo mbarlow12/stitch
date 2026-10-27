@@ -1,5 +1,3 @@
-"""Pytest fixtures for stitch-api tests."""
-
 from collections.abc import AsyncIterator
 from functools import partial
 from unittest.mock import AsyncMock, MagicMock
@@ -28,13 +26,6 @@ from .factories import OGFieldBaseFactory, ResourceFactory
 from .utils import make_create_resource, make_resource, make_source
 
 
-# The settings classes read a ``.env`` file relative to the working directory,
-# and ``make`` runs the suite from the repo root, so ``Settings()`` would
-# otherwise pick up a developer's local ``.env`` and mask the declared code
-# defaults that tests assert against. Disable dotenv loading here; real env vars
-# (e.g. OTEL_TRACES_EXPORTER, set in the rootdir conftest) still win. Importing
-# ``app`` above already built the cached settings singleton off ``.env``, so
-# clear it — the next read rebuilds it from defaults.
 for _settings_cls in (PostgresConfig, Settings, SqliteConfig):
     _settings_cls.model_config["env_file"] = None
 get_settings.cache_clear()
@@ -50,13 +41,11 @@ _ALL_LICENSED_CLAIMS = TokenClaims(
 
 @pytest.fixture
 def anyio_backend() -> str:
-    """Use asyncio backend only (aiosqlite doesn't support trio)."""
     return "asyncio"
 
 
 @pytest.fixture
 def test_user() -> User:
-    """Test user entity for dependency injection."""
     return User(
         id=1, sub="test|user-1", email="test@test.com", name="Test User", role="admin"
     )
@@ -64,7 +53,6 @@ def test_user() -> User:
 
 @pytest.fixture
 def test_user_model() -> UserModel:
-    """Test user ORM model for database seeding."""
     return UserModel(
         id=1,
         sub="test|user-1",
@@ -75,7 +63,6 @@ def test_user_model() -> UserModel:
 
 @pytest.fixture
 def mock_session() -> MagicMock:
-    """Mock AsyncSession with common methods."""
     session = MagicMock(spec=AsyncSession)
     session.get = AsyncMock(return_value=None)
     session.add = MagicMock()
@@ -88,7 +75,6 @@ def mock_session() -> MagicMock:
 
 @pytest.fixture
 def mock_session_factory(mock_session: MagicMock) -> MagicMock:
-    """Mock async_sessionmaker that returns mock_session."""
     factory = MagicMock(spec=async_sessionmaker)
     factory.return_value = mock_session
     return factory
@@ -96,7 +82,6 @@ def mock_session_factory(mock_session: MagicMock) -> MagicMock:
 
 @pytest.fixture
 def mock_uow(mock_session: MagicMock) -> MagicMock:
-    """Mock UnitOfWork for unit tests."""
     uow = MagicMock(spec=UnitOfWork)
     uow.session = mock_session
     uow.commit = AsyncMock()
@@ -106,7 +91,6 @@ def mock_uow(mock_session: MagicMock) -> MagicMock:
 
 @pytest.fixture(autouse=True)
 def reset_dependency_overrides():
-    """Reset FastAPI dependency overrides and auth caches after each test."""
     yield
     app.dependency_overrides = {}
     from stitch.api.auth import get_oidc_settings, get_jwt_validator
@@ -119,7 +103,6 @@ def reset_dependency_overrides():
 
 @pytest.fixture
 async def async_client(test_user: User) -> AsyncIterator[AsyncClient]:
-    """AsyncClient for testing FastAPI routes with mocked user."""
 
     def override_get_current_user() -> User:
         return test_user
@@ -139,7 +122,6 @@ async def async_client(test_user: User) -> AsyncIterator[AsyncClient]:
 
 @pytest.fixture
 async def integration_engine():
-    """In-memory SQLite async engine for integration tests."""
     non_view_tables = [
         t for t in StitchBase.metadata.sorted_tables if not t.info.get("is_view")
     ]
@@ -156,9 +138,6 @@ async def integration_engine():
 
     async with engine.begin() as conn:
         await conn.run_sync(StitchBase.metadata.create_all, tables=non_view_tables)
-        # Production seeds og_field_source_priority via Alembic; the test schema
-        # is built with create_all, so seed the priority order here from the
-        # canonical SOURCE_PRIORITY constant.
         await conn.execute(
             insert(OGFieldSourcePriority),
             [
@@ -174,7 +153,6 @@ async def integration_engine():
 async def integration_session_factory(
     integration_engine,
 ) -> async_sessionmaker[AsyncSession]:
-    """Session factory bound to integration test engine."""
     return async_sessionmaker(
         integration_engine,
         expire_on_commit=False,
@@ -185,7 +163,6 @@ async def integration_session_factory(
 async def integration_session(
     integration_session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncIterator[AsyncSession]:
-    """Fresh async session for integration tests."""
     async with integration_session_factory() as session:
         yield session
 
@@ -195,7 +172,6 @@ async def seeded_integration_session(
     integration_session: AsyncSession,
     test_user_model: UserModel,
 ) -> AsyncSession:
-    """Integration session with test user already created."""
     integration_session.add(test_user_model)
     await integration_session.commit()
     return integration_session
@@ -207,7 +183,6 @@ async def integration_client(
     test_user: User,
     test_user_model: UserModel,
 ) -> AsyncIterator[AsyncClient]:
-    """AsyncClient with real SQLite database for integration tests."""
 
     async with integration_session_factory() as session:
         session.add(test_user_model)

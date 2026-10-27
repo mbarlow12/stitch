@@ -1,12 +1,3 @@
-"""Rebuild or repair the resource-state read model.
-
-    python -m stitch.api.db.read_model.rebuild             # full rebuild
-    python -m stitch.api.db.read_model.rebuild --ids 12 34 # repair these resources
-
-A full rebuild recomputes every listable resource; CI runs one after each deploy
-and on a schedule, and it is safe while the API serves traffic. ``--ids``
-recomputes only the given resources (e.g. after fixing data by hand).
-"""
 
 from __future__ import annotations
 
@@ -30,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class ResourceStateRebuildError(RuntimeError):
-    """An expected failure, reported as one line rather than a traceback."""
+    ...
 
 
 def _positive_int(raw: str) -> int:
@@ -65,7 +56,6 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 async def _repair(
     session_factory: async_sessionmaker[AsyncSession], ids: list[int]
 ) -> None:
-    """Recompute the given resources, refusing unknown ids (likely typos)."""
     requested = sorted(set(ids))
     async with session_factory.begin() as session:
         existing = set(
@@ -91,9 +81,6 @@ async def _repair(
 
 
 async def _run(ids: list[int] | None, batch_size: int) -> None:
-    # Outside prod the app engine echoes every statement and its parameters; for
-    # a batch job over every resource that floods the logs. Progress is logged
-    # per batch instead.
     get_engine().echo = False
     session_factory = get_session_factory()
     try:

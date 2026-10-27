@@ -1,13 +1,3 @@
-"""End-to-end test for the request timing middleware.
-
-Exercises the full middleware -> endpoint -> DB path, which is where the
-per-request DB aggregation depends on contextvar propagation surviving
-BaseHTTPMiddleware's task hand-off and SQLAlchemy's async bridge. The generic
-request-summary log is emitted by the shared ``RequestContextMiddleware`` under
-the ``stitch.observability.request`` logger (captured via caplog); the API
-subclass grafts on the ``db_query_count`` / ``db_time_ms`` fields.
-"""
-
 import logging
 
 import pytest
@@ -104,7 +94,6 @@ class TestRequestTimingMiddleware:
                 await client.get("/things/42", headers={_SCENARIO_HEADER: "vol=50k"})
 
         assert _request_events(caplog)[-1]["scenario"] == "vol=50k"
-        # The label propagates from the middleware to the query listener.
         assert captured_queries, "expected query events to be captured"
         assert all(q["scenario"] == "vol=50k" for q in captured_queries)
 

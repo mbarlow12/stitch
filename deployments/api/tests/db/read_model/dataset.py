@@ -1,8 +1,3 @@
-"""A small deterministic dataset covering what can change a coalesced answer.
-
-Default source priority is rmi > wm > ccr > bc > alb > nor > gem > llm.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -29,17 +24,17 @@ BETA_OPERATORS = [{"name": "Aramco", "stake": 100.0}]
 
 @dataclass(frozen=True)
 class Dataset:
-    alpha: int  # public sources only; competing names; JSON + numeric values
-    beta: int  # wm outranks gem for name
-    gamma: int  # ccr outranks alb for basin; ccr alone supplies region
-    delta: int  # wm only: an all-null shell for profiles without wm
-    epsilon: int  # per-resource overrides invert the default order
-    empty: int  # active membership whose source has no values
-    inactive: int  # only an inactive membership: not listable
-    bare: int  # no memberships: not listable
-    merged: int  # current resource created by merging zeta_a + zeta_b
-    zeta_a: int  # merged away
-    zeta_b: int  # merged away
+    alpha: int
+    beta: int
+    gamma: int
+    delta: int
+    epsilon: int
+    empty: int
+    inactive: int
+    bare: int
+    merged: int
+    zeta_a: int
+    zeta_b: int
 
     @property
     def listable(self) -> set[int]:
@@ -70,7 +65,6 @@ async def attach(
     status: MembershipStatus = MembershipStatus.ACTIVE,
     **attrs: Any,
 ) -> int:
-    """Create a source with ``attrs`` and attach it directly (no action hooks)."""
     model = make_source_model(source=source, created_by_id=user.id, **attrs)
     session.add(model)
     await session.flush()
@@ -101,7 +95,6 @@ def override(
 
 
 async def seed_dataset(session: AsyncSession, user: User) -> Dataset:
-    """Seed the dataset and commit it, with no read-model state."""
     alpha = await new_resource(session, user)
     await attach(
         session,
@@ -187,8 +180,6 @@ async def seed_dataset(session: AsyncSession, user: User) -> Dataset:
     )
     assert merged.id is not None
 
-    # The merge action maintains read-model state as it goes; start every test
-    # from an empty read model instead, as after the schema migration.
     await session.execute(delete(OGFieldResourceState))
     await session.commit()
     return Dataset(
@@ -207,9 +198,6 @@ async def seed_dataset(session: AsyncSession, user: User) -> Dataset:
 
 
 async def dump_state(session: AsyncSession) -> dict[tuple[int, int], dict[str, Any]]:
-    """Every stored row as ``(resource_id, mask) -> {field..., provenance}``."""
-    # Plain table rows, not ORM entities, so nothing stale comes from the
-    # session's identity map.
     rows = (await session.execute(select(OGFieldResourceState.__table__))).all()
     return {
         (row.resource_id, row.permission_mask): {

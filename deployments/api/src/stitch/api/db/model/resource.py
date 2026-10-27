@@ -36,8 +36,6 @@ class ResourceModel(TimestampMixin, UserAuditMixin, Base):
         PORTABLE_BIGINT, ForeignKey("og_field_resources.id"), nullable=True
     )
 
-    # SQLAlchemy will automatically see the foreign key `memberships.resource_id`
-    # and configure the appropriate SQL statement to load the membership objects
     memberships: Mapped[list[MembershipModel]] = relationship()
 
     def as_empty_entity(self):
@@ -54,18 +52,6 @@ class ResourceModel(TimestampMixin, UserAuditMixin, Base):
         resource_ids: Collection[int],
         licensed_sources: Collection[OGSISrcKey] | None = None,
     ) -> dict[int, list[tuple[OGFieldSource, int]]]:
-        """Active ``(source entity, default priority)`` rows per resource id.
-
-        One query mirroring the SQL ``active_src`` CTE: membership -> resource ->
-        default priority -> source header, restricted to active memberships of
-        non-repointed resources. ``values`` selectin-loads with the entity;
-        licensing is applied in SQL. This is the raw source-listing helper for the
-        detail path -- it returns the *global default* priority only. Per-field
-        override tiering can't be expressed as one scalar per source (a record's
-        effective rank now varies by field), so field-scoped ordering lives in the
-        SQL ranking (``field_source_values`` / ``queries.add_ranking``), not here.
-        Rows are ordered by ``(default priority, source, source_pk)``.
-        """
         by_id: dict[int, list[tuple[OGFieldSource, int]]] = {
             rid: [] for rid in resource_ids
         }
@@ -79,8 +65,6 @@ class ResourceModel(TimestampMixin, UserAuditMixin, Base):
             .select_from(m)
             .join(r, r.id == m.resource_id)
             .join(p, p.source == m.source)
-            # dual-key: membership.source is not FK-tied to the header's source,
-            # so matching on source_pk alone could admit a mismatched row.
             .join(s, and_(s.id == m.source_pk, s.source == m.source))
             .where(
                 r.repointed_id.is_(None),

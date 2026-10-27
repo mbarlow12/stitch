@@ -1,18 +1,3 @@
-"""The write paths' row locks, on a real Postgres (opt-in).
-
-SQLite serializes all writers and has no row locks, so the always-on tests
-(``test_mutations``) can only check *when* each write takes its lock. These
-check what the locks do (opt-in, see ``postgres.py``):
-
-* a merge that waited on another re-reads its resources, so it sees they were
-  already merged (SQLite can't show a stale read);
-* the lock is ``FOR NO KEY UPDATE``, so it never conflicts with the key-share
-  locks that inserting rows referencing a resource takes -- with ``FOR UPDATE``,
-  creating a merge candidate during a merge deadlocks;
-* an attach queued behind a merge of its resource refuses once the merge
-  commits.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -41,14 +26,12 @@ from .postgres import requires_postgres
 
 pytestmark = [pytest.mark.anyio, requires_postgres]
 
-# How long a writer must stay blocked to count as waiting on the other's lock.
 _BLOCKED_FOR_SECONDS = 0.5
 
 type SessionFactory = async_sessionmaker[AsyncSession]
 
 
 async def _seed_resources(factory: SessionFactory, user: User, count: int) -> list[int]:
-    """``count`` listable resources, each with one gem source and current state."""
     async with factory.begin() as session:
         ids = []
         for i in range(count):
@@ -78,13 +61,9 @@ async def _attach_in_own_transaction(
 async def test_overlapping_merges_in_opposite_order_serialize(
     pg_session_factory: SessionFactory, test_user: User
 ):
-    """Locking in id order means two merges sharing resources queue instead of
-    deadlocking, and the second sees the first already merged them."""
     a, b, c = await _seed_resources(pg_session_factory, test_user, 3)
 
     async with pg_session_factory() as first, pg_session_factory() as second:
-        # The second session already holds a (soon stale) copy of ``b``, as the
-        # merge-candidate approval path does before merging.
         stale_b = await second.get(ResourceModel, b)
         assert stale_b is not None and stale_b.repointed_id is None
 
@@ -98,7 +77,7 @@ async def test_overlapping_merges_in_opposite_order_serialize(
 
         with pytest.raises(ResourceIntegrityError, match="already been merged"):
             await second_merge
-        assert stale_b.repointed_id is not None  # re-read, not the stale copy
+        assert stale_b.repointed_id is not None
         await second.rollback()
 
     async with pg_session_factory() as session:
@@ -111,11 +90,6 @@ async def test_overlapping_merges_in_opposite_order_serialize(
 async def test_merge_candidate_creation_and_a_merge_in_opposite_order_do_not_deadlock(
     pg_session_factory: SessionFactory, test_user: User
 ):
-    """Creating a merge candidate inserts its items in request order, each
-    taking a key-share lock on its resource; a merge locks its resources in id
-    order. A merge lock that conflicted with key-share (``FOR UPDATE``) would
-    deadlock here: the merge holds ``a`` and waits on ``b``, while the creation
-    holds ``b`` and waits on ``a``."""
     a, b = await _seed_resources(pg_session_factory, test_user, 2)
 
     async with pg_session_factory.begin() as creating:
@@ -154,9 +128,6 @@ async def test_merge_candidate_creation_and_a_merge_in_opposite_order_do_not_dea
 async def test_attach_waiting_on_a_merge_sees_the_resource_was_merged(
     pg_session_factory: SessionFactory, test_user: User
 ):
-    """An attach queued behind a merge of its resource re-reads it after the
-    merge commits and refuses, instead of attaching to a merged-away resource
-    whose memberships would never be listed."""
     a, b = await _seed_resources(pg_session_factory, test_user, 2)
 
     async with pg_session_factory() as merging:

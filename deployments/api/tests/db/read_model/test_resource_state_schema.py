@@ -1,5 +1,3 @@
-"""Schema and drift guards for ``og_field_resource_state``."""
-
 import pytest
 from sqlalchemy import JSON, Float, Integer, String, text
 from sqlalchemy.exc import IntegrityError
@@ -114,8 +112,6 @@ async def test_typed_values_round_trip(
 async def test_unset_json_value_is_sql_null(
     seeded_integration_session: AsyncSession, test_user: User
 ):
-    """An unset JSON field must be SQL NULL, not JSON ``null``, so it matches
-    ``IS NULL`` / ``NULLS LAST`` the same way a field with no winner does."""
     session = seeded_integration_session
     rid = await _new_resource(session, test_user)
     session.add(

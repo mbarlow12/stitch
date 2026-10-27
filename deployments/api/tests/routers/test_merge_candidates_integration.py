@@ -1,5 +1,3 @@
-"""Integration tests for the merge-candidate endpoints (real SQLite)."""
-
 from collections.abc import Sequence
 from unittest.mock import patch
 
@@ -35,7 +33,6 @@ async def _create_resource_with_sources(
     res_factory,
     sources: Sequence[OGFieldSource],
 ) -> int:
-    """POST a resource built from explicit source entities (controlled values)."""
     model: OGFieldResource = res_factory.build(
         id=None,
         source_data=list(sources),
@@ -77,11 +74,8 @@ class TestMergeCandidateDetailIntegration:
 
         assert body["status"] == "PENDING"
         assert body["resource_ids"] == [id_a, id_b]
-        # `resources` detail objects were dropped; `compare` carries everything.
         assert "resources" not in body
 
-        # `compare`: one entry per field; each value tagged with its source and
-        # the resource it is attached to (source_id, value, priority, resource_id).
         compare = {c["field"]: c for c in body["compare"]}
         name_cmp = compare["name"]
         for entry in name_cmp["values"]:
@@ -93,10 +87,8 @@ class TestMergeCandidateDetailIntegration:
                 "resource_id",
             } <= set(entry)
 
-        # The two resources resolve `name` to different values -> different.
         assert name_cmp["status"] == "different"
-        assert name_cmp["values"][0]["value"] == "Ghawar"  # winner-first by priority
-        # each source is attributed to the resource it is attached to
+        assert name_cmp["values"][0]["value"] == "Ghawar"
         rmi_by_resource = {
             (v["resource_id"], v["value"])
             for v in name_cmp["values"]
@@ -131,9 +123,6 @@ class TestMergeCandidateDetailIntegration:
         assert body["merged_resource_id"] is not None
         assert body["resource_ids"] == [id_a, id_b]
         assert "resources" not in body
-        # Live compute: originals are repointed with memberships INACTIVE, so no
-        # sources survive -> both resources are null everywhere, so every field
-        # matches with no values. (Freeze snapshot is deferred.)
         for entry in body["compare"]:
             assert entry["status"] == "match"
             assert entry["values"] == []
@@ -146,7 +135,6 @@ class TestMergeCandidateDetailIntegration:
         og_field_resource_factory,
         source_maker,
     ):
-        # Resource A carries RMI "RMI-name" (default winner) and GEM "GEM-name".
         id_a = await _create_resource_with_sources(
             integration_client,
             og_field_resource_factory,
@@ -161,9 +149,6 @@ class TestMergeCandidateDetailIntegration:
             [source_maker(source="rmi", managed=False, name="B-name")],
         )
 
-        # Override A's ordering so GEM outranks RMI for the NAME field -> A's
-        # coalesced name flips. Overrides are per-field, per-source-record now, so
-        # curate GEM's record for `name`.
         async with integration_session_factory() as session:
             gem_pk = await session.scalar(
                 select(MembershipModel.source_pk).where(
@@ -184,10 +169,9 @@ class TestMergeCandidateDetailIntegration:
             )
             await session.commit()
 
-        # A's coalesced value reflects the override: its name resolves to GEM's.
         detail_a = await integration_client.get(f"/oil-gas-fields/{id_a}/detail")
         assert detail_a.status_code == 200, detail_a.text
-        assert detail_a.json()["data"]["name"] == "GEM-name"  # override in effect
+        assert detail_a.json()["data"]["name"] == "GEM-name"
 
         candidate_id = await _create_candidate(integration_client, [id_a, id_b])
         resp = await integration_client.get(
@@ -196,9 +180,6 @@ class TestMergeCandidateDetailIntegration:
         assert resp.status_code == 200, resp.text
         body = resp.json()
 
-        # A resolves `name` to its override value (GEM-name), B to B-name, so the
-        # resources differ. `values` is winner-first by default priority (RMI),
-        # and both of A's sources are attributed to resource A.
         name_cmp = next(c for c in body["compare"] if c["field"] == "name")
         assert name_cmp["status"] == "different"
         assert name_cmp["values"][0]["value"] == "RMI-name"
@@ -209,8 +190,6 @@ class TestMergeCandidateDetailIntegration:
         }
         assert {("rmi", "RMI-name"), ("gem", "GEM-name")} <= a_values
 
-        # Approving materializes the reset: the merged resource has no override
-        # rows and resolves `name` in default order (RMI), dropping the override.
         approve = await integration_client.post(
             f"/oil-gas-fields/merge-candidates/{candidate_id}/approve",
         )
@@ -238,9 +217,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # Two overlapping candidates share resource A. Approving A+B -> D must
-        # repoint the pending A+C to D+C: it stays PENDING and its comparison now
-        # shows D's live values (STIT-418 AC 3).
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -263,22 +239,17 @@ class TestMergeCandidateDetailIntegration:
         assert resp.status_code == 200, resp.text
         body = resp.json()
 
-        # A(18) is gone; the candidate now compares D against C, still PENDING.
         assert body["status"] == "PENDING"
         assert body["resource_ids"] == [merged_d, id_c]
 
         name_cmp = next(c for c in body["compare"] if c["field"] == "name")
         value_resource_ids = {v["resource_id"] for v in name_cmp["values"]}
-        # No value is attributed to the merged-away original...
         assert id_a not in value_resource_ids
-        # ...D's live values are shown (not a null shell)...
         assert merged_d in value_resource_ids
-        # ...alongside C's own value.
         assert (id_c, "Safaniya") in {
             (v["resource_id"], v["value"]) for v in name_cmp["values"]
         }
 
-        # The re-routed candidate is now approvable (no already-merged 400).
         approve_ac = await integration_client.post(
             f"/oil-gas-fields/merge-candidates/{candidate_ac}/approve",
         )
@@ -291,8 +262,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # Once A is merged away, referencing it again is rejected with an id-based
-        # message -- no ORM repr() leak (`object at 0x...`).
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -321,8 +290,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # A+C and B+C both re-route to D+C when A+B is approved. They become the
-        # same proposal, so exactly one survives (the earlier-created candidate).
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -356,9 +323,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # Entity linkage emits pairwise candidates, so a 3-cluster {A,B,C} yields
-        # A+B, B+C, and A+C. Merging the cluster edge by edge must collapse the
-        # redundant third candidate rather than leave it as a stale dead end.
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -368,8 +332,6 @@ class TestMergeCandidateDetailIntegration:
         candidate_bc = await _create_candidate(integration_client, [id_b, id_c])
         candidate_ac = await _create_candidate(integration_client, [id_a, id_c])
 
-        # Merge A+B -> D. Both B+C and A+C re-route to D+C (the same proposal), so
-        # the later-created A+C is dropped and B+C survives.
         approve_ab = await integration_client.post(
             f"/oil-gas-fields/merge-candidates/{candidate_ab}/approve",
         )
@@ -388,8 +350,6 @@ class TestMergeCandidateDetailIntegration:
         assert survivor.json()["status"] == "PENDING"
         assert survivor.json()["resource_ids"] == [merged_d, id_c]
 
-        # Merge the surviving edge (now D+C) to finish the 3-way. A+C stays gone --
-        # no stale candidate resurfaces.
         approve_bc = await integration_client.post(
             f"/oil-gas-fields/merge-candidates/{candidate_bc}/approve",
         )
@@ -407,10 +367,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # Edge: a candidate that both dedupes an item (3-way A+B+C -> D+C) AND
-        # collides with an earlier-rerouted candidate (A+C -> D+C). The 3-way is
-        # processed second, so it both removes an orphan item and is deleted in the
-        # same flush -- this must not error.
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -443,9 +399,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # Approving the 3-way A+B+C -> D fully subsumes a pending A+B: it would
-        # collapse to a single member [D], which can never be approved. It must be
-        # deleted, not left as a PENDING dead end.
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -470,9 +423,6 @@ class TestMergeCandidateDetailIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        # A 3-way A+B+C where A+B is approved: A and B both collapse to D, so the
-        # candidate must dedupe to D+C without tripping the
-        # (merge_candidate_id, resource_id) unique constraint, and stay approvable.
         id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
         id_b = await _create_resource(integration_client, og_create_res_fact, "Burgan")
         id_c = await _create_resource(
@@ -491,7 +441,6 @@ class TestMergeCandidateDetailIntegration:
             f"/oil-gas-fields/merge-candidates/{candidate_abc}"
         )
         assert resp.status_code == 200, resp.text
-        # A and B collapsed to a single D member; C is preserved.
         assert resp.json()["status"] == "PENDING"
         assert resp.json()["resource_ids"] == [merged_d, id_c]
 
@@ -508,8 +457,6 @@ class TestMergeCandidateDetailIntegration:
         og_field_resource_factory,
         source_maker,
     ):
-        # Resource A is "composite": two basin sources, RMI (winner) = "Foo" and
-        # GEM = "Bar", so A resolves basin to "Foo".
         id_a = await _create_resource_with_sources(
             integration_client,
             og_field_resource_factory,
@@ -518,7 +465,6 @@ class TestMergeCandidateDetailIntegration:
                 source_maker(source="gem", managed=False, basin="Bar"),
             ],
         )
-        # Resource B has a single basin source = "Foo".
         id_b = await _create_resource_with_sources(
             integration_client,
             og_field_resource_factory,
@@ -533,8 +479,6 @@ class TestMergeCandidateDetailIntegration:
         body = resp.json()
 
         basin = next(c for c in body["compare"] if c["field"] == "basin")
-        # Both resources resolve basin to "Foo" (A's RMI winner beats its GEM
-        # "Bar"), so despite three sources in play the field matches.
         assert basin["status"] == "match"
         assert {
             (v["resource_id"], v["source"], v["value"]) for v in basin["values"]
@@ -613,7 +557,6 @@ async def test_link_all_reports_a_failed_commit_instead_of_success(
     integration_client: AsyncClient,
     og_create_res_fact: ResourceCreateFactory,
 ):
-    """A commit that fails must not surface as a 200 describing writes that rolled back."""
     id_a = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
     id_b = await _create_resource(integration_client, og_create_res_fact, "Ghawar")
 

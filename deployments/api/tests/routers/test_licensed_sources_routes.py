@@ -1,5 +1,3 @@
-"""Route-level integration tests for licensed-source filtering."""
-
 from collections.abc import AsyncIterator, Callable, Collection
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 
@@ -58,7 +56,6 @@ async def client_with(
     test_user: User,
     test_user_model: UserModel,
 ) -> ClientFactory:
-    """Make clients whose token holds exactly the given permissions."""
     async with integration_session_factory() as session:
         session.add(test_user_model)
         await session.commit()
@@ -92,7 +89,6 @@ async def gem_only_client(
     test_user: User,
     test_user_model: UserModel,
 ) -> AsyncIterator[AsyncClient]:
-    """Client whose token claims license only the `gem` source."""
     async with integration_session_factory() as session:
         session.add(test_user_model)
         await session.commit()
@@ -124,7 +120,6 @@ async def resource_only_client(
     test_user: User,
     test_user_model: UserModel,
 ) -> AsyncIterator[AsyncClient]:
-    """Client with resource read but no source read grants."""
     async with integration_session_factory() as session:
         session.add(test_user_model)
         await session.commit()
@@ -179,8 +174,6 @@ async def _seed_resource_with_sources(
                 )
             )
         await session.flush()
-        # Seeded directly, not through a write action: bring the read model the
-        # list reads from up to date, as the write actions do.
         await refresh_resource_states(session, [resource.id])
         await session.commit()
         return resource.id
@@ -226,8 +219,6 @@ class TestOilGasFieldsLicensedSources:
         permissions: set[str],
         path: str,
     ):
-        """The list is served from precomputed rows for exact permission
-        profiles, all of which include every public source."""
         await _seed_resource_with_sources(
             integration_session_factory,
             test_user,
@@ -313,8 +304,6 @@ class TestOilGasFieldsLicensedSources:
         test_user: User,
         path: str,
     ):
-        """``licensed_sources`` drops unknown ``source:read:<key>`` grants, so
-        the caller is matched on the rest: the public profile here."""
         await _seed_resource_with_sources(
             integration_session_factory,
             test_user,
@@ -343,8 +332,6 @@ class TestOilGasFieldsLicensedSources:
         monkeypatch: pytest.MonkeyPatch,
         path: str,
     ):
-        """A source added to the code but not yet classified as public or
-        restricted (``read_model.permissions``) matches no stored profile."""
         monkeypatch.setattr(
             api_permissions,
             "_VALID_SOURCES",

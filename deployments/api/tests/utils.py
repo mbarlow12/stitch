@@ -1,10 +1,3 @@
-# pyright: reportAny=false
-"""Factory functions for creating test data.
-
-Provides factory functions that return both Pydantic models and dictionaries
-for use in tests and HTTP client requests.
-"""
-
 from __future__ import annotations
 
 from functools import partial
@@ -51,11 +44,6 @@ def make_source_model(
     source_record: dict[str, Any] | None = None,
     **attrs: Any,
 ):
-    """Build a long-form source header ORM model + its value rows from kwargs.
-
-    Mirrors how the app persists a source record: identity/raw payload on the
-    header, each non-null attribute as a typed row in the long values table.
-    """
     from stitch.api.db.model import OilGasFieldSourceModel
     from stitch.api.db.model.oil_gas_field_source_value import (
         ATTRIBUTE_NAMES,
@@ -154,7 +142,6 @@ def make_create_resource(
     base_factory: OGFieldBaseFactory,
     sources: list[tuple[OGSISrcKey, bool]] | None = None,
 ) -> OGFieldResource:
-    """Create a minimal Resource payload for creation tests."""
     _mk_src = partial(make_source, fact=base_factory)
     if sources is None:
         sources = [("gem", False)]
@@ -181,7 +168,6 @@ def make_empty_resource(
     base_factory: OGFieldBaseFactory,
     sources: list[tuple[OGSISrcKey, bool]] = [],
 ) -> OGFieldResource:
-    """Alias for make_create_resource() kept for readability."""
     return make_resource(
         fact=factory, base_fact=base_factory, empty=True, sources=sources
     )

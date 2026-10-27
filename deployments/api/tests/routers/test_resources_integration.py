@@ -1,5 +1,3 @@
-"""Integration tests for resources router with real SQLite database."""
-
 from httpx import AsyncClient
 import pytest
 from sqlalchemy import select
@@ -10,11 +8,8 @@ from stitch.api.db.model import ResourceModel
 
 
 class TestResourcesIntegration:
-    """Integration tests for resources endpoints with real database."""
-
     @pytest.mark.anyio
     async def test_get_nonexistent_returns_404(self, integration_client):
-        """GET /resources/999 returns 404 status code."""
         response = await integration_client.get("/oil-gas-fields/999")
 
         assert response.status_code == 404
@@ -26,7 +21,6 @@ class TestResourcesIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        """POST /resources/ returns the created resource."""
         resource_in = og_create_res_fact(name="Integration Test Resource")
 
         response = await integration_client.post(
@@ -45,7 +39,6 @@ class TestResourcesIntegration:
         integration_client: AsyncClient,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        """POST creates resource, GET retrieves it."""
         resource_in = og_create_res_fact(name="Roundtrip Resource")
 
         create_response = await integration_client.post(
@@ -69,7 +62,6 @@ class TestResourcesIntegration:
         integration_session_factory: async_sessionmaker[AsyncSession],
         og_create_res_fact: ResourceCreateFactory,
     ):
-        """POST resource is persisted and queryable directly."""
         resource_in = og_create_res_fact(name="Persisted Resource")
 
         response = await integration_client.post(
@@ -101,7 +93,6 @@ class TestResourcesIntegration:
         og_create_res_fact: ResourceCreateFactory,
         source_maker: SourceFactory,
     ):
-        """POST /resources/ works with only required fields (no source data)."""
         resource_in = og_create_res_fact(name="Minimal Name", sources=[])
 
         response = await integration_client.post(
@@ -116,8 +107,6 @@ class TestResourcesIntegration:
 
 
 class TestRepointedResourceRedirect:
-    """GET on a merged-away resource resolves to its terminal resource (STIT-418)."""
-
     async def _create(self, client: AsyncClient, fact, name: str) -> int:
         resp = await client.post(
             "/oil-gas-fields/", json=fact(name=name).model_dump(mode="json")
@@ -126,7 +115,6 @@ class TestRepointedResourceRedirect:
         return resp.json()["id"]
 
     async def _repoint(self, session_factory, old_id: int, new_id: int) -> None:
-        """Point old_id at new_id, mirroring what apply_resource_merge does to a row."""
         async with session_factory() as session:
             model = await session.get(ResourceModel, old_id)
             model.repointed_id = new_id
@@ -151,7 +139,6 @@ class TestRepointedResourceRedirect:
         body = resp.json()
         assert body["id"] == root_id
         assert body["requested_resource_id"] == old_id
-        # Real data from the root, not the old resource's null shell.
         assert body["data"]["name"] == "Merged Root"
 
     @pytest.mark.anyio

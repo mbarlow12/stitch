@@ -1,5 +1,3 @@
-"""Behaviour tests for ``link_actions.match``; the cases live in ``link_actions_cases``."""
-
 from unittest.mock import AsyncMock
 
 import pytest
@@ -27,7 +25,6 @@ SEEDED_USER_ID = 1
 
 
 async def build(session: AsyncSession, state: State) -> None:
-    """Write ``state`` to the database, flushed but not committed."""
     mentioned = [rec.rid for rec in state.records]
     mentioned += list(state.repointed) + list(state.repointed.values())
     resource_count = max(mentioned, default=0)
@@ -97,7 +94,6 @@ async def build(session: AsyncSession, state: State) -> None:
 
 
 def assert_match_result(groups: Groups, expected: Groups) -> None:
-    """Check the universal return-shape contract, then the expected value."""
     seen = [rid for group in groups for rid in group]
     assert all(len(group) >= 2 for group in groups), groups
     assert all(list(group) == sorted(group) for group in groups), groups
@@ -113,7 +109,6 @@ def assert_match_result(groups: Groups, expected: Groups) -> None:
 async def test_match(
     seeded_integration_session: AsyncSession, state: State, expected: Groups
 ) -> None:
-    """Each case's database goes in; the duplicate groups it must produce come out."""
     await build(seeded_integration_session, state)
     groups = await link_actions.match(seeded_integration_session, state.licensed)
     assert_match_result(groups, expected)
@@ -123,7 +118,6 @@ async def test_match(
 async def test_match_does_not_commit(
     seeded_integration_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``match`` reads only; the caller owns the transaction."""
     session = seeded_integration_session
     state, expected = case(
         MEMBERSHIP_AND_RESOURCE_ELIGIBILITY, "both-memberships-active", as_param=False

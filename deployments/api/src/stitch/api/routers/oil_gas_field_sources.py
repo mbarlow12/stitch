@@ -34,21 +34,6 @@ async def create_oil_gas_field_source(
     uow: UnitOfWorkDep,
     user: CurrentUser,
 ) -> OGFieldSourceView:
-    """Create and return a bare Oil & Gas Field Source. Does not create memberships or associated resource.
-
-    Deprecated: creates a source detached from any resource, which breaks the
-    invariant that a source is always attached to at least one resource. Use
-    ``POST /oil-gas-fields/{id}/sources`` to create a source and attach it to a
-    resource. This route will be removed once STIT-527 lands.
-
-    Args:
-        source: raw source data
-        uow: unit of work (db transaction context)
-        user: the logged in User
-
-    Returns:
-        The OGFieldSource_ object with created id
-    """
     session = uow.session
 
     return await og_field_source_actions.create_source(

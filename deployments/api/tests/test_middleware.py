@@ -1,5 +1,3 @@
-"""Tests for CORS middleware configuration."""
-
 from collections.abc import AsyncIterator
 
 import pytest
@@ -12,7 +10,6 @@ from stitch.api.settings import get_settings
 
 @pytest.fixture
 async def cors_client() -> AsyncIterator[AsyncClient]:
-    """AsyncClient for testing CORS without auth overrides."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test/api/v1",
@@ -21,24 +18,19 @@ async def cors_client() -> AsyncIterator[AsyncClient]:
 
 
 class TestCorsMiddleware:
-    """Tests for CORS middleware behavior."""
-
     @pytest.fixture
     def allowed_origin(self) -> str:
-        """Get the configured allowed origin from settings."""
         settings = get_settings()
         return str(settings.frontend_origin_url).rstrip("/")
 
     @pytest.fixture
     def disallowed_origin(self) -> str:
-        """An origin that is not in the allowed list."""
         return "http://malicious-site.com"
 
     @pytest.mark.anyio
     async def test_preflight_request_returns_cors_headers(
         self, cors_client: AsyncClient, allowed_origin: str
     ):
-        """OPTIONS preflight request returns all required CORS headers."""
         response = await cors_client.options(
             "/health",
             headers={
@@ -56,7 +48,6 @@ class TestCorsMiddleware:
     async def test_simple_request_includes_cors_origin_header(
         self, cors_client: AsyncClient, allowed_origin: str
     ):
-        """GET request with valid Origin header includes CORS origin in response."""
         response = await cors_client.get(
             "/health",
             headers={"Origin": allowed_origin},
@@ -69,7 +60,6 @@ class TestCorsMiddleware:
     async def test_credentials_header_is_true(
         self, cors_client: AsyncClient, allowed_origin: str
     ):
-        """Response includes Access-Control-Allow-Credentials: true."""
         response = await cors_client.get(
             "/health",
             headers={"Origin": allowed_origin},
@@ -81,7 +71,6 @@ class TestCorsMiddleware:
     async def test_disallowed_origin_gets_no_cors_headers(
         self, cors_client: AsyncClient, disallowed_origin: str
     ):
-        """Request from disallowed origin does not receive CORS headers."""
         response = await cors_client.get(
             "/health",
             headers={"Origin": disallowed_origin},
@@ -94,7 +83,6 @@ class TestCorsMiddleware:
     async def test_allowed_methods_in_preflight_response(
         self, cors_client: AsyncClient, allowed_origin: str
     ):
-        """Preflight response includes all configured allowed methods."""
         response = await cors_client.options(
             "/health",
             headers={
@@ -116,7 +104,6 @@ class TestCorsMiddleware:
     async def test_allowed_headers_in_preflight_response(
         self, cors_client: AsyncClient, allowed_origin: str
     ):
-        """Preflight response includes all configured allowed headers."""
         response = await cors_client.options(
             "/health",
             headers={

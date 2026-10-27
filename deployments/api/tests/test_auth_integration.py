@@ -1,5 +1,3 @@
-"""Integration tests for auth module JIT user provisioning."""
-
 import pytest
 from sqlalchemy import select
 
@@ -20,14 +18,11 @@ def _make_claims(
 
 
 class TestGetCurrentUserJITProvisioning:
-    """Integration tests for get_current_user with real database."""
-
     @pytest.mark.anyio
     async def test_creates_user_on_first_login(
         self,
         integration_session_factory,
     ):
-        """New user created in DB on first login."""
         claims = _make_claims(sub="auth0|new-user")
 
         user = await get_current_user(claims, integration_session_factory)
@@ -50,7 +45,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """Existing user found by sub claim."""
         async with integration_session_factory() as session:
             session.add(
                 UserModel(
@@ -74,7 +68,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """Claims update reflected in DB on subsequent login."""
         async with integration_session_factory() as session:
             session.add(
                 UserModel(
@@ -103,7 +96,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """User can be JIT-provisioned when name and email claims are absent."""
         claims = _make_claims(sub="auth0|no-claims", email=None, name=None)
 
         user = await get_current_user(claims, integration_session_factory)
@@ -126,7 +118,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """Blank or whitespace-only claims are normalized to null."""
         claims = _make_claims(sub="auth0|blank-claims", email="  ", name="")
 
         user = await get_current_user(claims, integration_session_factory)
@@ -149,7 +140,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """Null name/email columns get populated when later claims provide them."""
         async with integration_session_factory() as session:
             session.add(UserModel(sub="auth0|backfill", name=None, email=None))
             await session.commit()
@@ -177,7 +167,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """Blank claim values should be ignored during back-fill."""
         async with integration_session_factory() as session:
             session.add(
                 UserModel(
@@ -213,7 +202,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """JIT-provisioned user persists even if the caller's transaction rolls back."""
         claims = _make_claims(sub="auth0|durable")
 
         with pytest.raises(RuntimeError):
@@ -234,7 +222,6 @@ class TestGetCurrentUserJITProvisioning:
         self,
         integration_session_factory,
     ):
-        """Claim back-fill persists even if the caller's transaction rolls back."""
         async with integration_session_factory() as session:
             session.add(UserModel(sub="auth0|durable-backfill", name=None, email=None))
             await session.commit()

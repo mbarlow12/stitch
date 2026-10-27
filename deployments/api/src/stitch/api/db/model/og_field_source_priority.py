@@ -1,10 +1,3 @@
-"""Source priority lookup table for coalescing field values.
-
-The canonical order lives in ``stitch.ogsi.model.SOURCE_PRIORITY``. Production
-databases are seeded by the Alembic migrations; the integration tests seed this
-table from ``SOURCE_PRIORITY`` in a conftest fixture (they build the schema with
-``create_all`` rather than running migrations).
-"""
 
 from sqlalchemy import Integer, String
 from sqlalchemy.orm import Mapped, mapped_column

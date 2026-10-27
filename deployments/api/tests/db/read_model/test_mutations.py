@@ -1,11 +1,3 @@
-"""Every write that can change a cached answer keeps the read model in sync.
-
-Each test runs a real write action on a rebuilt dataset, commits, and checks the
-maintained state equals a from-scratch recompute of every resource. The lock
-tests check that recomputes take the resource lock before reading anything; the
-lock itself only has an effect on Postgres (see ``test_concurrency_postgres``).
-"""
-
 from __future__ import annotations
 
 from collections.abc import Collection
@@ -37,7 +29,6 @@ pytestmark = pytest.mark.anyio
 
 
 async def _assert_matches_recompute(session: AsyncSession) -> None:
-    """The committed, write-maintained state equals recomputing every resource."""
     maintained = await dump_state(session)
     all_ids = (await session.scalars(select(ResourceModel.id))).all()
     await refresh_resource_states(session, all_ids)
@@ -112,7 +103,6 @@ class TestWritesKeepStateInSync:
         await session.commit()
 
         stored = await dump_state(session)
-        # rmi outranks both gem and wm.
         for mask in PERMISSION_MASKS:
             assert stored[(rebuilt.beta, mask)]["name"] == "Beta RMI"
         await _assert_matches_recompute(session)
@@ -229,16 +219,10 @@ class TestWritesKeepStateInSync:
 
 
 class TestInPlaceSourceValueEdit:
-    """No write path edits a stored source value today. If one is added, it changes
-    every resource the source is attached to, so it must refresh all of them --
-    the per-resource hooks above don't cover it."""
-
     async def test_must_refresh_every_resource_linked_to_the_source(
         self, seeded_integration_session: AsyncSession, rebuilt: Dataset
     ):
         session = seeded_integration_session
-        # Zeta's gem source is attached to both the merged-away original and the
-        # merged resource.
         zeta_gem = await session.scalar(
             select(MembershipModel.source_pk).where(
                 MembershipModel.resource_id == rebuilt.zeta_a
@@ -254,7 +238,6 @@ class TestInPlaceSourceValueEdit:
         )
         await session.commit()
 
-        # Without a refresh the cache is stale.
         assert (await dump_state(session))[(rebuilt.merged, 0)]["country"] == "IND"
 
         linked = (
@@ -273,12 +256,6 @@ class TestInPlaceSourceValueEdit:
 
 
 class TestLockBeforeRecompute:
-    """Option (a): runs everywhere, checks the lock is taken before any read.
-
-    SQLite doesn't render row locks, so the lock call is recorded with a spy
-    alongside every SQL statement the engine executes.
-    """
-
     @pytest.fixture
     def events(
         self, integration_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
@@ -339,7 +316,6 @@ class TestLockBeforeRecompute:
             sorted([rebuilt.alpha, rebuilt.beta, rebuilt.gamma]),
         )
         locks = [e for e in events if isinstance(e, tuple)]
-        # Then one refresh covering the originals and the new resource.
         assert len(locks) == 2
         assert set(locks[0][1]) < set(locks[1][1])
 
@@ -378,9 +354,6 @@ class TestLockBeforeRecompute:
             )
             resource_id = rebuilt.alpha
 
-        # Locking first -- before the action's own reads -- is what makes a
-        # writer that waited read the other's committed changes (e.g. a merge)
-        # instead of acting on what it read before.
         assert events[0] == ("LOCK", [resource_id])
         state_writes = [
             e for e in events if isinstance(e, str) and "og_field_resource_state" in e

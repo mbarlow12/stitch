@@ -1,5 +1,3 @@
-"""Tests for database configuration and UnitOfWork behavior."""
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,10 +7,7 @@ from stitch.api.db.config import UnitOfWork
 
 
 class TestUnitOfWork:
-    """Tests for UnitOfWork context manager behavior."""
-
     def test_session_raises_before_enter(self):
-        """RuntimeError if session accessed before 'async with'."""
         factory = MagicMock(spec=async_sessionmaker)
         uow = UnitOfWork(factory)
 
@@ -23,7 +18,6 @@ class TestUnitOfWork:
     async def test_session_available_after_enter(
         self, mock_session_factory, mock_session
     ):
-        """Session available after entering async context."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:
@@ -31,7 +25,6 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_closes_session_on_exit(self, mock_session_factory, mock_session):
-        """Session.close() called after context exit."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:
@@ -41,7 +34,6 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_session_none_after_exit(self, mock_session_factory):
-        """Session is None after exiting context."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:
@@ -52,7 +44,6 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_rollback_on_exception(self, mock_session_factory, mock_session):
-        """Rollback called when exception raised in context."""
         uow = UnitOfWork(mock_session_factory)
 
         with pytest.raises(ValueError, match="test error"):
@@ -63,7 +54,6 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_no_rollback_on_success(self, mock_session_factory, mock_session):
-        """Rollback not called when context exits normally."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:
@@ -73,7 +63,6 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_auto_commits_on_success(self, mock_session_factory, mock_session):
-        """Commit called automatically when context exits without exception."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:
@@ -83,7 +72,6 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_no_commit_on_exception(self, mock_session_factory, mock_session):
-        """Commit not called when exception raised in context."""
         uow = UnitOfWork(mock_session_factory)
 
         with pytest.raises(ValueError):
@@ -94,18 +82,15 @@ class TestUnitOfWork:
 
     @pytest.mark.anyio
     async def test_commit_method(self, mock_session_factory, mock_session):
-        """Commit delegates to session.commit()."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:
             await uow.commit()
 
-        # Called twice: once manually, once in __aexit__
         assert mock_session.commit.await_count == 2
 
     @pytest.mark.anyio
     async def test_rollback_method(self, mock_session_factory, mock_session):
-        """Rollback method delegates to session.rollback()."""
         uow = UnitOfWork(mock_session_factory)
 
         async with uow:

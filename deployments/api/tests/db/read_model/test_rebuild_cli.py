@@ -1,5 +1,3 @@
-"""The rebuild / repair command (``python -m stitch.api.db.read_model.rebuild``)."""
-
 from __future__ import annotations
 
 import logging
@@ -107,7 +105,6 @@ class TestCommand:
         caplog: pytest.LogCaptureFixture,
     ):
         caplog.set_level(logging.INFO)
-        # A stale row for a merged-away resource gets removed.
         await seeded_integration_session.execute(
             insert(OGFieldResourceState).values(
                 resource_id=rebuilt.zeta_a, permission_mask=0, provenance={}
@@ -133,5 +130,4 @@ class TestCommand:
         with pytest.raises(ResourceStateRebuildError, match="999999"):
             await rebuild_cli._run(ids=[rebuilt.alpha, 999_999], batch_size=1)
 
-        # The valid id was not repaired either: nothing changed.
         assert await dump_state(session) == corrupted

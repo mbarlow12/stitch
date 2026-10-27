@@ -1,9 +1,3 @@
-"""Parameter tables for ``test_link_actions``, as ``{case id: [records, expected, *extras]}``.
-
-A record is the positional tuple ``(rid, name, country, source, status)``, trailing
-fields omittable. ``case`` turns one table entry into the ``State`` under test.
-"""
-
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -25,8 +19,6 @@ Cases = dict[str, list[Any]]
 
 @dataclass(frozen=True)
 class Rec:
-    """One source record with its value rows and membership; ``None`` writes no value row."""
-
     rid: int
     name: str | None
     country: str | None
@@ -36,8 +28,6 @@ class Rec:
 
 @dataclass(frozen=True)
 class State:
-    """The database a case starts from; resources ``1..N`` are implied by ``records`` and ``repointed``."""
-
     records: tuple[Rec, ...] = ()
     repointed: Mapping[int, int] = field(default_factory=dict)
     candidates: Candidates = ()
@@ -45,12 +35,10 @@ class State:
 
 
 def repointed(targets: Mapping[int, int]) -> Extra:
-    """Repoint resources, given as ``{resource id: target id}``."""
     return ("repointed", targets)
 
 
 def licensed(*sources: OGSISrcKey) -> Extra:
-    """Restrict the caller's licences; no argument licenses nothing."""
     return ("licensed", frozenset(sources))
 
 
@@ -59,22 +47,18 @@ def _candidates(status: MergeCandidateStatus, id_sets: tuple[tuple[int, ...], ..
 
 
 def denied(*id_sets: tuple[int, ...]) -> Extra:
-    """A DENIED merge candidate per id set, in the order given."""
     return _candidates(MergeCandidateStatus.DENIED, id_sets)
 
 
 def pending(*id_sets: tuple[int, ...]) -> Extra:
-    """A PENDING merge candidate per id set, in the order given."""
     return _candidates(MergeCandidateStatus.PENDING, id_sets)
 
 
 def approved(*id_sets: tuple[int, ...]) -> Extra:
-    """An APPROVED merge candidate per id set, in the order given."""
     return _candidates(MergeCandidateStatus.APPROVED, id_sets)
 
 
 def case(table: Cases, case_id: str, *, as_param: bool = True) -> Any:
-    """Return one case as a ``pytest.param``, or as the bare ``(state, expected)`` pair."""
     records, expected, *extras = table[case_id]
     overrides = dict(extras)
     assert len(overrides) == len(extras), f"{case_id}: conflicting state extras"
@@ -83,7 +67,6 @@ def case(table: Cases, case_id: str, *, as_param: bool = True) -> Any:
 
 
 def params(table: Cases) -> list[Any]:
-    """Every case in ``table`` as a ``pytest.param``, in table order."""
     return [case(table, case_id) for case_id in table]
 
 

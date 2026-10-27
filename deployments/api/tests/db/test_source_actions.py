@@ -1,5 +1,3 @@
-"""Database integration tests for og_field_source_actions query/count."""
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,8 +23,6 @@ _QueryParams = OGFieldQueryParams
 
 
 class TestSourceQueryAction:
-    """Integration tests for source_actions.query() and count()."""
-
     @pytest.fixture
     async def seeded_sources(
         self,
@@ -34,7 +30,6 @@ class TestSourceQueryAction:
         test_user: User,
         og_create_res_fact: ResourceCreateFactory,
     ):
-        """Create 3 resources (each with sources + active memberships)."""
         for name in ["Alpha", "Bravo", "Charlie"]:
             await resource_actions.create(
                 session=seeded_integration_session,
@@ -98,8 +93,6 @@ class TestSourceDetailAction:
 
 
 class TestCreateAndAttachSources:
-    """Integration tests for source_actions.create_and_attach_sources()."""
-
     @staticmethod
     def _gem_source(name: str, **attrs) -> GemSource:
         return GemSource(
@@ -136,11 +129,9 @@ class TestCreateAndAttachSources:
             resource_id=resource_id,
         )
 
-        # Returned in input order, each with an assigned id.
         assert [c.name for c in created] == ["Alpha", "Bravo"]
         assert all(c.id is not None for c in created)
 
-        # Each created source has an ACTIVE membership on the resource.
         memberships = (
             (
                 await seeded_integration_session.execute(
@@ -175,8 +166,6 @@ class TestCreateAndAttachSources:
 
 
 class TestAttachSourcesDedup:
-    """A source is attached to a given resource at most once."""
-
     @staticmethod
     async def _membership_count(
         session: AsyncSession, resource_id: int, source_pk: int

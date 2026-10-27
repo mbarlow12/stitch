@@ -61,13 +61,6 @@ _ALL_SOURCES: frozenset[OGSISrcKey] = frozenset(get_args(OGSISrcKey))
 
 
 def _profile_mask(licensed_sources: Collection[OGSISrcKey] | None) -> int:
-    """The read-model profile to answer from, or 403 if the caller has none.
-
-    ``None`` comes only from internal callers and means every source, as it
-    always has. Anyone else must hold exactly one of the stored profiles (see
-    ``read_model.permissions``): a caller missing a public source, or holding a
-    source not in any profile, is refused rather than shown a different set.
-    """
     if licensed_sources is None:
         licensed_sources = _ALL_SOURCES
     mask = read_model_mask(licensed_sources)
@@ -89,14 +82,6 @@ async def query(
     params: OGFieldQueryParams,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> tuple[list[OGFieldListItemView], int]:
-    """Query coalesced resource list items, restricted to licensed sources.
-
-    Served from the precomputed read model (``og_field_resource_state``) for
-    the caller's permission profile; 403 if they have none. The page's rows are
-    read by the same statement that picks them, so a write that lands
-    mid-request (e.g. a merge removing a resource's rows) can't remove a row
-    between choosing the page and loading it.
-    """
     if params.sort_by == "source":
         raise HTTPException(
             status_code=422,
@@ -104,8 +89,6 @@ async def query(
         )
     mask = _profile_mask(licensed_sources)
 
-    # Count without the ORDER BY: Postgres would otherwise sort every matching
-    # row just to count them (~40ms at 50K resources for a non-indexed sort).
     count_stmt = select(func.count()).select_from(
         resource_state_query(params, mask).order_by(None).subquery()
     )
@@ -117,9 +100,6 @@ async def query(
 
 
 def _state_row_to_list_item_view(row: Any) -> OGFieldListItemView:
-    """Build the list item from a stored row: the same ``OilGasFieldBase``
-    inputs the detail view coalesces, and provenance keyed in attribute order
-    (JSONB does not keep key order)."""
     return OGFieldListItemView(
         id=row.resource_id,
         data=OilGasFieldBase(
@@ -133,17 +113,7 @@ async def filter_options(
     session: AsyncSession,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> dict[str, list[str]]:
-    """Distinct coalesced values for every filterable field.
-
-    Read from the precomputed read model for the caller's permission profile;
-    403 if they have none.
-    """
     mask = _profile_mask(licensed_sources)
-    # One DISTINCT per field, each answered from its (permission_mask, field)
-    # index. A single UNION ALL of all six was measured slower at 50K resources
-    # (the cost is the index scans, not round trips); that the six statements
-    # may see slightly different moments only affects dropdown suggestions,
-    # transiently.
     options: dict[str, list[str]] = {}
     with named_query("resources.filter_options"):
         for field in FILTER_OPTION_FIELDS:
@@ -176,18 +146,6 @@ async def get(
 
 
 async def resolve_root_id(session: AsyncSession, id: int) -> int:
-    """Resolve a resource id to its terminal (root) resource id, following repoints.
-
-    404 if ``id`` does not exist; a non-repointed id returns itself. Read-only
-    endpoints use this so a request for a merged-away resource acts on the
-    resource it was merged into. The write path (merges, priority edits)
-    intentionally does NOT resolve -- it must act on the exact requested row.
-
-    Resolution collapses the whole chain: ``A -> C -> F -> J`` resolves ``A`` to
-    ``J``. The ``repointed_id`` graph is acyclic by construction
-    (``apply_resource_merge`` always targets a brand-new row), so ``get_root``
-    terminates.
-    """
     with named_query("resources.resolve_root"):
         model = await session.scalar(
             select(ResourceModel).where(ResourceModel.id == id)
@@ -202,9 +160,6 @@ async def resolve_root_id(session: AsyncSession, id: int) -> int:
         try:
             return (await model.get_root(session)).id
         except ResourceNotFoundError as exc:
-            # Unreachable under current invariants (FK + acyclic merges + the
-            # self-reference validator), but a corrupt repoint chain must not
-            # surface as an unhandled 500 on a read path.
             raise HTTPException(
                 status_code=HTTP_404_NOT_FOUND,
                 detail=(
@@ -218,11 +173,6 @@ async def get_resolved(
     id: int,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> OGFieldResource:
-    """Return resource ``id``, following repoints to the terminal (root) resource.
-
-    Read-only wrapper over ``resolve_root_id`` + ``get``; see ``resolve_root_id``
-    for the resolution semantics.
-    """
     root_id = await resolve_root_id(session, id)
     return await get(session, root_id, licensed_sources=licensed_sources)
 
@@ -233,28 +183,13 @@ async def field_source_values(
     field: str,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> list[OGFieldSourceValueView]:
-    """Every source's value for one field of a resource, winner-first.
-
-    Returns only sources that carry a value for ``field`` (unset omitted), in the
-    same tiered per-field ranking coalescing uses -- curated (overridden) records
-    first by override priority, then the rest by global default priority. The
-    first entry is the coalesced winner. Licensing is applied. Each view's
-    ``priority`` is its 0-based rank position (list order is authoritative);
-    ``is_override`` flags the curated rows.
-    """
     if field not in ATTRIBUTE_NAMES:
         raise HTTPException(
             status_code=422,
             detail=f"field={field} is not a known resource field.",
         )
-    # Resolve repoints so a merged-away id returns the terminal resource's field
-    # sources (and 404s a genuinely missing id), consistent with the
-    # single-resource read endpoints.
     root_id = await resolve_root_id(session, id)
 
-    # field_source_candidates ranks in SQL by the same tiered key as the coalesce
-    # winner, so the row order is winner-first and rank is just the enumerate
-    # index. Empty text can't be persisted, so every returned row is a real value.
     with named_query("resources.field_source_values"):
         rows = (
             await session.execute(
@@ -286,25 +221,11 @@ async def set_field_source_priority(
     ordered_source_pks: Sequence[int],
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> list[OGFieldSourceValueView]:
-    """Persist a curator's per-field source ordering; return the new ranking.
-
-    ``ordered_source_pks`` must cover *exactly* the source records that currently
-    carry a value for ``field`` (licensed, non-empty) -- the same set
-    ``field_source_values`` returns -- each once, best-first. The save is a
-    complete snapshot: every override row for ``(resource, field)`` is replaced
-    with one row per record at ``priority = index``. Records added later have no
-    override row, so they land in the default tier and rank last until re-curated
-    (see ``add_ranking``). Writing nothing when the order is unchanged keeps the
-    default tier (and its "new source ranks by default priority" behaviour) intact.
-    """
     if field not in ATTRIBUTE_NAMES:
         raise HTTPException(
             status_code=422,
             detail=f"field={field} is not a known resource field.",
         )
-    # Lock before reading or writing anything, so concurrent writes to this
-    # resource queue here and each reads the other's committed changes; then
-    # re-read it in case it was merged while we waited.
     with named_query("resources.set_field_source_priority.load"):
         await lock_resources(session, [id])
         resource = await session.get(ResourceModel, id, populate_existing=True)
@@ -319,19 +240,12 @@ async def set_field_source_priority(
     if len(set(ordered_source_pks)) != len(ordered_source_pks):
         raise InvalidActionError("ordered_source_pks contains duplicate ids.")
 
-    # Belt-and-suspenders behind the route's all-source-read requirement: this
-    # write replaces the field's entire override set, so a caller who cannot read
-    # every source could clobber rankings for sources they can't see. Require the
-    # full set here too. (Revisit when partial-license reordering is supported.)
     if licensed_sources is not None and set(licensed_sources) != _ALL_SOURCES:
         raise InvalidActionError(
             "You must have read permissions for all sources to reorder a field's "
             "sources."
         )
 
-    # Eligibility + current effective order come from the same ranked read the GET
-    # endpoint uses: licensed sources with a non-empty value for the field,
-    # winner-first.
     with named_query("resources.set_field_source_priority.candidates"):
         rows = (
             await session.execute(field_source_candidates(id, field, licensed_sources))
@@ -346,8 +260,6 @@ async def set_field_source_priority(
             f"unexpected={sorted(requested - eligible)})."
         )
 
-    # No-op: the requested order already matches the effective order, so persist
-    # nothing (and leave any records in the default tier there).
     if list(ordered_source_pks) == current_order:
         return await field_source_values(session, id, field, licensed_sources)
 
@@ -371,7 +283,6 @@ async def set_field_source_priority(
                 )
             )
         await session.flush()
-        # The new order can change this resource's winners.
         await refresh_resource_state(session, id)
     return await field_source_values(session, id, field, licensed_sources)
 
@@ -379,14 +290,6 @@ async def set_field_source_priority(
 async def create(
     session: AsyncSession, user: CurrentUser, resource: OGFieldResource
 ) -> OGFieldResource:
-    """
-    Here we create a resource either from new source data or existing source data. It's also possible
-    to create an empty resource with no reference to source data.
-
-    - create the resource
-    - create the sources
-    - create membership
-    """
     if resource.repointed_to is not None:
         raise ResourceIntegrityError(
             f"Cannot create resource that has been repointed.\n\tNew: {repr(resource)}"
@@ -412,23 +315,12 @@ async def apply_resource_merge(
     user: CurrentUser,
     resource_ids: Sequence[int],
 ) -> OGFieldResource:
-    """Merge ``resource_ids`` into a brand-new resource.
-
-    - Create a new resource and set every input resource's ``repointed_id`` to it.
-    - Repoint memberships onto the new resource, one per source record (see
-      ``_repoint_memberships``).
-    """
-    # preserve order but drop duplicates
     unique_ids = list(dict.fromkeys(resource_ids))
     if len(unique_ids) < 2:
         raise InvalidActionError(
             f"Merging only possible between multiple ids: received: {unique_ids}"
         )
 
-    # Lock the originals (in id order, so overlapping merges can't deadlock)
-    # before reading them, and re-read their current state rather than any copy
-    # the session already holds: a merge that waited on the lock must see that
-    # a concurrent merge already repointed them.
     stmt = (
         select(ResourceModel)
         .where(ResourceModel.id.in_(unique_ids))
@@ -451,31 +343,18 @@ async def apply_resource_merge(
             f"Cannot merge any resource that has already been merged: {moved}."
         )
 
-    # all ids exist, none have already been repointed
-    #
-    # The merge target is a brand-new resource with no rows in
-    # og_field_resource_source_priority, so it resolves fields in the default
-    # global source order. Any per-field/per-resource priority overrides on the
-    # originals are intentionally NOT carried over -- merging resets ordering to
-    # default. (No-op reset today since the target is fresh; a later PR handles
-    # an explicit reset if merge semantics ever preserve an existing resource.)
     with named_query("resources.merge.apply"):
         new_resource = ResourceModel.create(created_by=user)
         session.add(new_resource)
         await session.flush()
 
-        # all results are still members of the session
-        # changes will be picked up on commit
         for res in results:
             res.repointed_id = new_resource.id
 
         _ = await _repoint_memberships(session, user, new_resource.id, unique_ids)
 
-        # The originals stop being listable (their rows are removed) and the new
-        # resource becomes listable with their combined sources.
         await refresh_resource_states(session, [*unique_ids, new_resource.id])
 
-        # Return the canonical resource entity
         await session.refresh(new_resource, ["memberships"])
         return await resource_model_to_entity(session, new_resource)
 
@@ -486,23 +365,6 @@ async def _repoint_memberships(
     to_id: int,
     from_ids: Sequence[int],
 ) -> Sequence[MembershipModel]:
-    """Create new memberships pointing to a different resource.
-
-    Collect all memberships whose `resource_id` is in `from_ids`. For each distinct `source_pk` among
-    these, create one new membership where `resource_id` = `to_id`. Every ACTIVE original membership is
-    set INACTIVE.
-
-    This all takes place after an approved merge candidate is applied and a new ResourceModel is created.
-
-    Args:
-        session: the db session
-        user: the logged in user
-        to_id: the new resource id
-        from_ids: the original resource_ids
-
-    Returns:
-        Sequence of newly created `MembershipModel` objects.
-    """
     res = await session.get(ResourceModel, to_id)
     if res is None:
         raise ResourceNotFoundError(f"No resource found for id = {to_id}.")

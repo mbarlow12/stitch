@@ -1,7 +1,3 @@
-"""
-Unit tests for PaginationParams offset/limit computation.
-"""
-
 from stitch.api.entities import PaginationParams
 
 

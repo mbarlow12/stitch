@@ -46,13 +46,10 @@ _DEV_CLAIMS = TokenClaims(
     raw={},
 )
 
-# auto_error=False so that when AUTH_DISABLED=true the missing header
-# doesn't trigger a 403 before our custom handler runs.
 _bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def validate_auth_config_at_startup() -> None:
-    """Called from FastAPI lifespan. Fail fast if misconfigured."""
     settings = get_settings()
     if settings.auth_disabled:
         if not settings.allows_disabled_auth:
@@ -61,20 +58,13 @@ def validate_auth_config_at_startup() -> None:
             )
         logger.warning("Auth is disabled — all requests use dev credentials")
         return
-    get_oidc_settings()  # fail fast if required OIDC fields missing
+    get_oidc_settings()
 
 
 async def get_token_claims(
     request: Request,
     _credential: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
 ) -> TokenClaims:
-    """Extract and validate JWT from Authorization header.
-
-    The ``_credential`` parameter exists solely so FastAPI registers the
-    HTTPBearer security scheme in the OpenAPI spec (Swagger "Authorize"
-    button).  Actual token parsing still uses the raw header so we can
-    return precise 401 messages for missing/malformed values.
-    """
     if get_settings().auth_disabled:
         return _DEV_CLAIMS
 
@@ -143,11 +133,6 @@ def require_permissions(
 
 
 async def get_current_user(claims: Claims, session_factory: SessionFactoryDep) -> User:
-    """Resolve TokenClaims to a User entity. JIT provision on first login.
-
-    Runs in a dedicated session so user creation and claim back-fill
-    persist even if the request handler later errors.
-    """
     async with session_factory() as session:
         try:
             user_model = (
@@ -169,9 +154,6 @@ async def get_current_user(claims: Claims, session_factory: SessionFactoryDep) -
             await session.commit()
         except IntegrityError:
             await session.rollback()
-            # Known risk: we do not try to recover from simultaneous first-login
-            # races. If two requests create the same sub concurrently, one may
-            # receive a transient 500 from the unique constraint violation.
             raise
 
         return _to_entity(user_model)

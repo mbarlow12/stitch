@@ -60,10 +60,6 @@ def get_engine() -> AsyncEngine:
         slow_query_ms=settings.slow_query_ms,
         log_all_queries=settings.log_all_queries,
     )
-    # Per-query spans (separate from the aggregate timing listener above).
-    # get_engine is @lru_cache'd, so this instruments the engine once per
-    # process — SQLAlchemyInstrumentor is not safely re-entrant per engine.
-    # setup_sqlalchemy_tracing is a no-op when tracing is disabled.
     setup_sqlalchemy_tracing(engine.sync_engine, settings=settings)
     return engine
 

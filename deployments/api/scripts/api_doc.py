@@ -1,6 +1,4 @@
-#! /usr/bin/env -S uv run --package stitch-api --exact
 
-"""CLI for generating and validating the Stitch API reference."""
 
 from __future__ import annotations
 
@@ -17,9 +15,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 def resolve_ref(schema: dict, openapi: dict) -> tuple[str | None, dict]:
-    """Resolve a $ref pointer. Returns (schema_name, schema_dict)."""
     if "$ref" in schema:
-        ref_path = schema["$ref"]  # e.g. "#/components/schemas/Foo"
+        ref_path = schema["$ref"]
         name = ref_path.rsplit("/", 1)[-1]
         parts = ref_path.lstrip("#/").split("/")
         node = openapi
@@ -30,7 +27,6 @@ def resolve_ref(schema: dict, openapi: dict) -> tuple[str | None, dict]:
 
 
 def format_type(prop: dict, openapi: dict) -> str:
-    """Format a property's type as a readable string."""
     if "$ref" in prop:
         name, _ = resolve_ref(prop, openapi)
         return name or "object"
@@ -58,7 +54,6 @@ def format_type(prop: dict, openapi: dict) -> str:
         return f"array[{item_type}]"
 
     if typ == "object":
-        # Check for additionalProperties (dict-like)
         if "additionalProperties" in prop:
             val_type = format_type(prop["additionalProperties"], openapi)
             return f"object[string, {val_type}]"
@@ -68,7 +63,6 @@ def format_type(prop: dict, openapi: dict) -> str:
 
 
 def render_properties(schema: dict, openapi: dict) -> list[str]:
-    """Render a schema's properties as bulleted lines."""
     _, resolved = resolve_ref(schema, openapi)
     props = resolved.get("properties", {})
     lines = []
@@ -79,7 +73,6 @@ def render_properties(schema: dict, openapi: dict) -> list[str]:
 
 
 def get_request_body_schema(operation: dict) -> dict | None:
-    """Extract the schema from a request body, if present."""
     body = operation.get("requestBody")
     if not body:
         return None
@@ -89,7 +82,6 @@ def get_request_body_schema(operation: dict) -> dict | None:
 
 
 def get_response_schema(operation: dict) -> tuple[str, dict | None]:
-    """Extract the success response status and schema."""
     responses = operation.get("responses", {})
     for status in ("200", "201", "204"):
         if status in responses:
@@ -98,7 +90,6 @@ def get_response_schema(operation: dict) -> tuple[str, dict | None]:
             json_content = content.get("application/json", {})
             schema = json_content.get("schema")
             return status, schema
-    # Fall back to first response
     if responses:
         status = next(iter(responses))
         resp = responses[status]
@@ -109,10 +100,8 @@ def get_response_schema(operation: dict) -> tuple[str, dict | None]:
 
 
 def generate_markdown(openapi: dict) -> str:
-    """Generate the full Markdown document."""
     lines = ["# Stitch API Reference", ""]
 
-    # Group paths by tag
     grouped: dict[str, list[tuple[str, str, dict]]] = {}
     for path, methods in openapi.get("paths", {}).items():
         for method, operation in methods.items():
@@ -122,7 +111,6 @@ def generate_markdown(openapi: dict) -> str:
                 grouped.setdefault(tag, []).append((method.upper(), path, operation))
 
     for tag, endpoints in grouped.items():
-        # Section heading
         heading = tag.replace("-", " ").replace("_", " ").title()
         lines.append(f"## {heading}")
         lines.append("")
@@ -133,13 +121,9 @@ def generate_markdown(openapi: dict) -> str:
             lines.append("<!-- description -->")
             lines.append("")
 
-            # Request body
             req_schema = get_request_body_schema(operation)
             if req_schema:
                 name, _ = resolve_ref(req_schema, openapi)
-                # Named models show their schema name; unions / inline bodies
-                # (e.g. "GemSource | ...") show their composed type, mirroring
-                # how responses are rendered below.
                 label = f"`{name}`" if name else format_type(req_schema, openapi)
                 lines.append(f"**Request Body:** {label}")
                 lines.append("")
@@ -147,7 +131,6 @@ def generate_markdown(openapi: dict) -> str:
                 lines.extend(prop_lines)
                 lines.append("")
 
-            # Response
             status, resp_schema = get_response_schema(operation)
             lines.append(f"**Response:** `{status}`")
             lines.append("")
@@ -156,7 +139,6 @@ def generate_markdown(openapi: dict) -> str:
                 if prop_lines:
                     lines.extend(prop_lines)
                 else:
-                    # Array or primitive response
                     type_str = format_type(resp_schema, openapi)
                     lines.append(f"- {type_str}")
                 lines.append("")
@@ -168,14 +150,12 @@ def generate_markdown(openapi: dict) -> str:
 
 
 def get_doc_endpoints(doc_path: Path) -> set[str]:
-    """Extract endpoint signatures from markdown headings."""
     text = doc_path.read_text()
     matches = re.findall(r"### `(\w+) (.+?)`", text)
     return {f"{method} {path}" for method, path in matches}
 
 
 def get_openapi_endpoints() -> set[str]:
-    """Extract endpoint signatures from the OpenAPI schema."""
     openapi = app.openapi()
     endpoints = set()
     for path, methods in openapi.get("paths", {}).items():
@@ -187,7 +167,7 @@ def get_openapi_endpoints() -> set[str]:
 
 @click.group()
 def cli():
-    """Stitch API documentation tools."""
+    ...
 
 
 @cli.command()
@@ -205,7 +185,6 @@ def cli():
     help="Write to API_REFERENCE_<timestamp>.md.",
 )
 def gen(output: str | None, new: bool):
-    """Generate a Markdown API reference from the OpenAPI schema."""
     if output and new:
         raise click.UsageError("--output and --new are mutually exclusive.")
 
@@ -233,7 +212,6 @@ def gen(output: str | None, new: bool):
     required=False,
 )
 def check(path: str | None):
-    """Check API reference doc against the OpenAPI schema."""
     doc_path = (
         Path(path) if path else (SCRIPT_DIR / ".." / "API_REFERENCE.md").resolve()
     )

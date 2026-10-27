@@ -1,22 +1,3 @@
-"""Build and maintain ``og_field_resource_state`` from the coalescer.
-
-Every stored row comes from ``queries.coalesced_winner_rows`` -- the same SQL
-ranking the detail view coalesces with -- run once per permission profile with
-that profile's exact source set. There is no second ranking implementation, so
-stored state can't drift from how a resource coalesces. Values are materialized
-the same way the detail view materializes them and are not validated here: like
-any read, a list page validates the rows it shows, so a stored value today's
-model rejects can't stop a rebuild or a write.
-
-* ``refresh_resource_states`` recomputes the given resources inside the caller's
-  transaction: lock their rows, delete their state, and re-insert one row per
-  profile for those still listable. A resource that stopped being listable (e.g.
-  merged away) is left with no rows.
-* ``rebuild_all_resource_state`` recomputes every listable resource in committed
-  batches, then removes rows of resources that are no longer listable. It never
-  empties the table: each batch replaces only its own resources' rows, so a
-  reader mid-rebuild finds a complete row for every resource.
-"""
 
 from __future__ import annotations
 
@@ -40,12 +21,6 @@ DEFAULT_BATCH_SIZE: Final[int] = 500
 
 
 def lock_resources_statement(resource_ids: Collection[int]) -> Select[tuple[int]]:
-    """``SELECT ... FOR NO KEY UPDATE`` over the resource rows, in ascending id
-    order.
-
-    A stable order means two transactions locking overlapping sets (e.g. two
-    merges) always queue in the same order instead of deadlocking.
-    """
     return (
         select(ResourceModel.id)
         .where(ResourceModel.id.in_(sorted(set(resource_ids))))
@@ -55,31 +30,11 @@ def lock_resources_statement(resource_ids: Collection[int]) -> Select[tuple[int]
 
 
 async def lock_resources(session: AsyncSession, resource_ids: Collection[int]) -> None:
-    """Lock the resource rows until the caller's transaction ends.
-
-    ``FOR NO KEY UPDATE`` is the lock Postgres already takes to update a
-    resource's non-key columns (e.g. a merge setting ``repointed_id``). It
-    conflicts with itself, so concurrent writers to a resource queue, but not
-    with the key-share lock that inserting any row referencing a resource takes
-    (a membership, a merge candidate's items, ...). ``FOR UPDATE`` would conflict
-    with those: a transaction holding one resource and waiting on a second,
-    while an insert holds a key-share lock on the second and waits on the first,
-    deadlock.
-
-    Write actions take it at their start, before their own reads: the second of
-    two concurrent writers waits, then reads the first's committed changes --
-    including a merge that repointed the resource -- so neither acts on stale
-    data or overwrites the other with a stale recompute.
-    ``refresh_resource_states`` locks again (a no-op when already held) to
-    protect callers like the full rebuild. SQLite has no row locks (it already
-    serializes writers), so this is a no-op there.
-    """
     if resource_ids:
         await session.execute(lock_resources_statement(resource_ids))
 
 
 def _empty_state_row(resource_id: int, mask: int) -> dict[str, Any]:
-    """A row with every field (and its provenance) unset."""
     return {
         "resource_id": resource_id,
         "permission_mask": mask,
@@ -91,11 +46,6 @@ def _empty_state_row(resource_id: int, mask: int) -> dict[str, Any]:
 async def _compute_state_rows(
     session: AsyncSession, resource_ids: list[int]
 ) -> list[dict[str, Any]]:
-    """Rows for every ``(resource, profile)`` pair: one winner query per profile.
-
-    Each winner's value is materialized and its source key recorded as
-    provenance. Fields with no winner stay unset.
-    """
     rows: list[dict[str, Any]] = []
     for mask in PERMISSION_MASKS:
         by_id = {rid: _empty_state_row(rid, mask) for rid in resource_ids}
@@ -118,17 +68,6 @@ async def _compute_state_rows(
 async def refresh_resource_states(
     session: AsyncSession, resource_ids: Collection[int]
 ) -> list[int]:
-    """Make the given resources' stored state match authoritative data.
-
-    Runs in the caller's transaction, so it commits (or rolls back) with the
-    write that triggered it. Resources that are no longer listable end up with
-    no rows; ids that don't exist are ignored. Returns the ids that were
-    recomputed (the listable ones), in ascending order.
-
-    Its queries are labeled ``read_model.refresh`` (rather than the calling
-    write's label), so the cost the read model adds to writes and rebuilds can
-    be seen on its own.
-    """
     ids = sorted(set(resource_ids))
     if not ids:
         return []
@@ -155,12 +94,10 @@ async def refresh_resource_states(
 
 
 async def refresh_resource_state(session: AsyncSession, resource_id: int) -> None:
-    """``refresh_resource_states`` for a single resource."""
     await refresh_resource_states(session, [resource_id])
 
 
 async def _delete_unlistable_state(session: AsyncSession) -> None:
-    """Drop rows of resources that are no longer listable (e.g. merged away)."""
     universe = resource_universe().subquery()
     await session.execute(
         delete(OGFieldResourceState).where(
@@ -174,14 +111,6 @@ async def rebuild_all_resource_state(
     *,
     batch_size: int = DEFAULT_BATCH_SIZE,
 ) -> int:
-    """Recompute every listable resource's state; return how many were rebuilt.
-
-    Each batch commits on its own and locks only its own resources, so the API
-    keeps serving throughout: reads never wait, and a write waits at most for
-    the batch holding its resource. Rows of resources that are no longer
-    listable are removed at the end. A failed run leaves every batch it
-    finished in place; running it again finishes the job.
-    """
     if batch_size < 1:
         raise ValueError(f"batch_size must be at least 1, got {batch_size}")
 

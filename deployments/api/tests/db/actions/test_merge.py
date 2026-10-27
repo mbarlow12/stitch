@@ -1,6 +1,1 @@
-class TestMergeResourcesUnit:
-    """
-    test cases:
-    * with mocked session
-      *
-    """
+class TestMergeResourcesUnit: ...
