@@ -1,5 +1,3 @@
-"""Source subclassing & validation tests."""
-
 from __future__ import annotations
 
 import json
@@ -25,11 +23,6 @@ def assert_has_error(errors: list[dict], *, type: str, loc: tuple) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# Subclassing
-# ---------------------------------------------------------------------------
-
-
 class TestSourceSubclassing:
     def test_instantiation_preserves_types(self):
         src = FooSource(
@@ -50,7 +43,6 @@ class TestSourceSubclassing:
         assert isinstance(src.value, float)
 
     def test_source_default_from_subclass(self):
-        """Subclass-declared default means source need not be passed."""
         foo = FooSource(
             id=1,
             value=1.0,
@@ -74,7 +66,6 @@ class TestSourceSubclassing:
         assert bar.source == "bar"
 
     def test_id_type_specialization(self):
-        # int id with coercion from numeric string
         foo = FooSource(
             id="42",
             value=1.0,
@@ -87,7 +78,6 @@ class TestSourceSubclassing:
         assert foo.id == 42
         assert isinstance(foo.id, int)
 
-        # UUID id
         uid = uuid4()
         bar = BarSource(
             id=uid,
@@ -101,7 +91,6 @@ class TestSourceSubclassing:
         assert bar.id == uid
         assert isinstance(bar.id, UUID)
 
-        # UUID id
         uid = UUID("550e8400-e29b-41d4-a716-446655440000")
         uuidsrc = UuidSource(
             id=uid,
@@ -162,11 +151,6 @@ class TestSourceSubclassing:
         assert bar.label == "test"
 
 
-# ---------------------------------------------------------------------------
-# Validation
-# ---------------------------------------------------------------------------
-
-
 class TestSourceValidation:
     def test_source_record_accepts_nested_json_payload(self):
         record = SourceRecord.model_validate(
@@ -223,7 +207,6 @@ class TestSourceValidation:
         assert_has_error(exc_info.value.errors(), type="uuid_parsing", loc=("id",))
 
     def test_float_coerces_to_int_losslessly(self):
-        """Lossless float->int coercion works (JS interop)."""
         payload = json.dumps(
             {
                 "id": 3.0,

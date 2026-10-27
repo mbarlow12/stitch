@@ -64,8 +64,6 @@ ALB_SRC: Final[ALBSrcKey] = "alb"
 BC_SRC: Final[BCSrcKey] = "bc"
 NOR_SRC: Final[NORSrcKey] = "nor"
 
-# Canonical source coalescing priority (highest first). Single source of truth
-# for the coalescer, the query-param default, and the DB seed.
 SOURCE_PRIORITY: Final[tuple[OGSISrcKey, ...]] = (
     RMI_SRC,
     WM_SRC,
@@ -171,9 +169,6 @@ OG_FIELD_SOURCE_VIEW_ADAPTER = TypeAdapter(OGFieldSourceView)
 
 class OGFieldView(OilGasFieldBase):
     id: int
-    # STIT-418: when a request for a merged-away resource is redirected to the
-    # resource it was merged into, this holds the id the caller originally asked
-    # for. ``None`` when the caller received exactly the resource it requested.
     requested_resource_id: int | None = None
 
 
@@ -185,8 +180,6 @@ class OGFieldListItemView(BaseModel):
 
 class OGFieldDetailView(OGFieldListItemView):
     source_data: list[OGFieldSourceView] = Field(default_factory=list)
-    # STIT-418: see ``OGFieldView.requested_resource_id``. Set when the detail
-    # endpoint redirected a merged-away resource to its terminal resource.
     requested_resource_id: int | None = None
 
     @field_validator("source_data", mode="before")
@@ -201,19 +194,6 @@ class OGFieldDetailView(OGFieldListItemView):
 
 
 class OGFieldSourceValueView(BaseModel):
-    """One source's value for a single field, in effective priority order.
-
-    Returned by the per-field source-values endpoint, winner-first. ``source_id``
-    is the id of the source record (distinct from any resource id). ``priority``
-    is the row's 0-based rank in that order (0 = coalesced winner); it is a rank
-    *position*, not the stored priority number, because per-field tiering means
-    the raw numbers are no longer a single cross-record total order. **Consumers
-    rely on list order**, which is authoritative. ``is_override`` marks a row a
-    curator has explicitly re-ranked for this field (tier 0); non-override rows
-    (tier 1) fall back to the global default priority and rank below every
-    curated row.
-    """
-
     source: OGSISrcKey
     source_id: int
     value: Any

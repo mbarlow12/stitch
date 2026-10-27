@@ -1,9 +1,3 @@
-"""Fixtures for stitch-ogsi tests.
-
-Each fixture constructs a realistic domain object, doubling as
-documentation for how the models are intended to be used.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -23,7 +17,6 @@ from stitch.ogsi.model import (
 
 @pytest.fixture
 def gem_source() -> GemSource:
-    """A GEM source record for a producing onshore oil field."""
     return GemSource(
         id=42,
         name="Permian Basin Field A",
@@ -48,7 +41,6 @@ def gem_source() -> GemSource:
 
 @pytest.fixture
 def wm_source() -> WoodMacSource:
-    """A WoodMac source record with minimal fields populated."""
     return WoodMacSource(
         id=99,
         name="North Sea Field B",

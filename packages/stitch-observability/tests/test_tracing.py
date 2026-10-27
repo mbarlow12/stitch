@@ -25,8 +25,6 @@ def test_configure_tracing_disabled_returns_none() -> None:
 
 
 def test_configure_tracing_rejects_unknown_exporter() -> None:
-    # A direct caller that bypasses OTelSettings gets a fail-fast error rather
-    # than silently falling through to the console exporter.
     with pytest.raises(ValueError, match="exporter must be one of"):
         configure_tracing(service_name="svc", exporter="consle")
 
@@ -37,9 +35,6 @@ def test_configure_tracing_rejects_out_of_range_sample_ratio() -> None:
 
 
 def test_configure_tracing_builds_provider_with_resource(monkeypatch) -> None:
-    # configure_tracing installs the provider globally via set_tracer_provider;
-    # stub that out so this test exercises only provider construction and leaves
-    # the process-global provider untouched (OTel makes it set-once).
     monkeypatch.setattr(trace, "set_tracer_provider", lambda _provider: None)
     provider = configure_tracing(
         service_name="stitch-test",
@@ -55,9 +50,6 @@ def test_configure_tracing_builds_provider_with_resource(monkeypatch) -> None:
 
 
 def test_configure_tracing_omits_missing_keys_so_env_wins(monkeypatch) -> None:
-    # With version/environment unset they are omitted, so env-provided
-    # OTEL_RESOURCE_ATTRIBUTES survive Resource.create()'s merge — this is the
-    # deployment-tagging path (deployment.name set once in CI, stamped on spans).
     monkeypatch.setenv("OTEL_RESOURCE_ATTRIBUTES", "deployment.name=pr-7")
     monkeypatch.setattr(trace, "set_tracer_provider", lambda _provider: None)
     provider = configure_tracing(service_name="svc", exporter="console")
@@ -154,7 +146,6 @@ def test_setup_sqlalchemy_tracing_instruments_when_enabled(monkeypatch) -> None:
 
 
 def test_logging_span_exporter_emits_one_record_per_span(caplog) -> None:
-    # A local provider + the exporter under test; never touches the global.
     exporter = LoggingSpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -168,14 +159,10 @@ def test_logging_span_exporter_emits_one_record_per_span(caplog) -> None:
     assert len(records) == 1
     assert records[0].event["span_name"] == "unit-span"
     assert "trace_id" in records[0].event
-    # Resource attributes are emitted so the stdout span stream carries the same
-    # deployment tags as the OTLP path.
     assert "resource" in records[0].event
 
 
 def test_logging_span_exporter_truncates_long_attributes(caplog) -> None:
-    # An over-long attribute (e.g. a big SQLAlchemy db.statement) is capped so a
-    # single span log record can't dump an unbounded string to stdout.
     exporter = LoggingSpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -189,12 +176,10 @@ def test_logging_span_exporter_truncates_long_attributes(caplog) -> None:
     records = [r for r in caplog.records if r.name == "stitch.observability.trace"]
     logged = records[0].event["attributes"]["db.statement"]
     assert logged.endswith("…")
-    assert len(logged) == 2000 + 1  # 2000-char cap + the ellipsis
+    assert len(logged) == 2000 + 1
 
 
 def test_logging_span_exporter_truncates_sequence_attributes(caplog) -> None:
-    # OTel array attributes bypass a str-only cap; each element's length and the
-    # element count are both bounded so a list attribute can't dump unbounded.
     exporter = LoggingSpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -213,13 +198,11 @@ def test_logging_span_exporter_truncates_sequence_attributes(caplog) -> None:
     assert tags[0].endswith("…") and len(tags[0]) == 2000 + 1
     assert tags[1] == "short"
     many = attrs["many"]
-    assert len(many) == 100 + 1  # 100 items + the "(+N more)" marker
+    assert len(many) == 100 + 1
     assert many[-1].startswith("…")
 
 
 def test_logging_span_exporter_truncates_resource_attributes(caplog) -> None:
-    # Resource attributes (from OTEL_RESOURCE_ATTRIBUTES, unbounded by design) are
-    # bounded on the log record just like span attributes.
     exporter = LoggingSpanExporter()
     provider = TracerProvider(resource=Resource.create({"deployment.name": "x" * 5000}))
     provider.add_span_processor(SimpleSpanProcessor(exporter))
@@ -244,7 +227,6 @@ def test_otel_settings_defaults_and_bounds() -> None:
 
 
 def test_in_memory_exporter_captures_spans() -> None:
-    # Demonstrates the local-provider pattern the jobs trace test uses.
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))

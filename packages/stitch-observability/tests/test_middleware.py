@@ -54,9 +54,6 @@ def test_scenario_header_is_captured_and_truncated(caplog) -> None:
 
 
 def test_subclass_hooks_add_fields(caplog) -> None:
-    # Validates the extension contract the API's RequestTimingMiddleware will use
-    # to graft on its DB aggregates without reimplementing the request-id / span
-    # / logging plumbing.
     finished: list[object] = []
 
     class WithExtras(RequestContextMiddleware):
@@ -78,8 +75,6 @@ def test_subclass_hooks_add_fields(caplog) -> None:
 
 
 def test_context_vars_reset_after_request() -> None:
-    # The middleware resets the context vars in its finally block; outside a
-    # request they read their defaults.
     client = TestClient(_make_app())
     client.get("/things/1")
     assert mw.request_id_var.get() is None
@@ -89,9 +84,6 @@ def test_context_vars_reset_after_request() -> None:
 
 @pytest.mark.parametrize("raising_hook", ["on_request_start", "request_log_fields"])
 def test_context_vars_reset_when_a_hook_raises(raising_hook) -> None:
-    # A raising subclass hook must not leak request context: the resets live in
-    # an outer finally so request_id/route/scenario return to their defaults even
-    # when the hook blows up mid-request.
     class Boom(RequestContextMiddleware):
         def on_request_start(self, request):
             if raising_hook == "on_request_start":
@@ -113,16 +105,8 @@ def test_context_vars_reset_when_a_hook_raises(raising_hook) -> None:
 
 
 def test_middleware_import_without_starlette_points_at_asgi_extra(monkeypatch) -> None:
-    # Starlette is an optional `asgi` extra, guarded at the middleware's top-level
-    # import. Simulate a consumer that installed stitch-observability WITHOUT the
-    # extra and assert the import fails with a message naming the extra, not a
-    # bare ModuleNotFoundError. All sys.modules edits go through monkeypatch so
-    # they're restored at teardown and the suite stays order-independent.
 
-    # Force the guarded imports to run again on re-import.
     monkeypatch.delitem(sys.modules, "stitch.observability.middleware", raising=False)
-    # Make `import starlette` fail: drop cached submodules and point the parent at
-    # None — the canonical way to make an installed package look absent.
     for name in list(sys.modules):
         if name == "starlette" or name.startswith("starlette."):
             monkeypatch.delitem(sys.modules, name, raising=False)

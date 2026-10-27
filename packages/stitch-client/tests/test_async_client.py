@@ -250,9 +250,6 @@ async def test_wait_for_health_raises_after_retries_are_exhausted() -> None:
     await raw_client.aclose()
 
 
-# --- opt-in retry on transient statuses -------------------------------------
-
-
 @pytest.mark.anyio
 async def test_retry_statuses_retries_then_succeeds() -> None:
     calls: list[int] = []
@@ -311,15 +308,13 @@ async def test_status_not_in_retry_set_fast_fails() -> None:
         await client.get_auth_me()
 
     assert exc_info.value.status_code == 422
-    assert calls == [1]  # a non-listed status is never retried
+    assert calls == [1]
 
     await raw_client.aclose()
 
 
 @pytest.mark.anyio
 async def test_default_client_does_not_retry_statuses() -> None:
-    """No ``retry_statuses`` (the default) preserves fast-fail on a 5xx, so
-    existing callers are unaffected."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -338,8 +333,6 @@ async def test_default_client_does_not_retry_statuses() -> None:
 
 @pytest.mark.anyio
 async def test_post_is_not_retried_on_5xx_status() -> None:
-    """A listed 5xx is not retried on a non-idempotent POST: the request may
-    have already taken effect, so re-sending it could duplicate the write."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -354,15 +347,13 @@ async def test_post_is_not_retried_on_5xx_status() -> None:
         await client.create_merge_candidate([1, 2])
 
     assert exc_info.value.status_code == 503
-    assert calls == [1]  # POST + 5xx: fast-fail, no retry
+    assert calls == [1]
 
     await raw_client.aclose()
 
 
 @pytest.mark.anyio
 async def test_post_is_retried_on_429_status() -> None:
-    """A listed status < 500 (e.g. 429) is unprocessed, so it retries even on a
-    non-idempotent POST."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -383,8 +374,6 @@ async def test_post_is_retried_on_429_status() -> None:
 
 @pytest.mark.anyio
 async def test_post_is_not_retried_on_post_send_transport_error() -> None:
-    """A read timeout may follow a write the server already applied, so it is not
-    retried on a non-idempotent POST."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -396,15 +385,13 @@ async def test_post_is_not_retried_on_post_send_transport_error() -> None:
     with pytest.raises(httpx.ReadTimeout):
         await client.create_merge_candidate([1, 2])
 
-    assert calls == [1]  # POST + post-send transport error: no retry
+    assert calls == [1]
 
     await raw_client.aclose()
 
 
 @pytest.mark.anyio
 async def test_post_is_retried_on_connect_error() -> None:
-    """A connect failure never reached the server, so it is safe to retry even a
-    non-idempotent POST."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -449,7 +436,6 @@ async def test_retry_after_header_is_honored(monkeypatch: pytest.MonkeyPatch) ->
     )
 
     assert await client.get_auth_me() == {"ok": True}
-    # The header wins over the 0.5s exponential backoff.
     assert slept == [7.0]
 
     await raw_client.aclose()
@@ -902,7 +888,6 @@ async def test_create_merge_candidate_sends_expected_request() -> None:
 async def test_list_oil_gas_fields_page_rejects_out_of_range_page_size(
     page_size: int,
 ) -> None:
-    """The resource list route shares the server's 1..200 cap."""
     called = False
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -923,7 +908,6 @@ async def test_list_oil_gas_fields_page_rejects_out_of_range_page_size(
 
 @pytest.mark.anyio
 async def test_iter_oil_gas_fields_rejects_out_of_range_page_size() -> None:
-    """The guard reaches the iter_/collect_ wrappers through the page fetch."""
     called = False
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -961,7 +945,6 @@ async def test_list_oil_gas_fields_page_rejects_page_below_one() -> None:
 
 
 def test_max_page_size_is_publicly_exported() -> None:
-    """Callers sizing a full scan should not reach into the private module."""
     import stitch.client
 
     assert stitch.client.MAX_PAGE_SIZE == 200
@@ -970,7 +953,6 @@ def test_max_page_size_is_publicly_exported() -> None:
 
 @pytest.mark.anyio
 async def test_list_oil_gas_field_sources_page_sends_expected_request() -> None:
-    """Path, method, and the stable-scan sort defaults reach the wire."""
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1006,11 +988,9 @@ async def test_list_oil_gas_field_sources_page_sends_expected_request() -> None:
 
 @pytest.mark.anyio
 async def test_list_oil_gas_field_sources_page_repeats_source_param() -> None:
-    """A sequence of source keys serializes as repeated params, not a CSV value."""
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        # dict(request.url.params) would collapse the repeats to the first value.
         captured["source"] = request.url.params.get_list("source")
         captured["query"] = request.url.query.decode("utf-8")
         return httpx.Response(200, json={"items": [], "total_pages": 1})
@@ -1044,8 +1024,6 @@ async def test_list_oil_gas_field_sources_page_omits_source_when_unset() -> None
 
 @pytest.mark.anyio
 async def test_list_oil_gas_field_sources_page_rejects_empty_source() -> None:
-    """An empty sequence vanishes from the query string and would select *every*
-    source, so it is refused before the request goes out."""
     called = False
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1069,9 +1047,6 @@ async def test_list_oil_gas_field_sources_page_rejects_empty_source() -> None:
 async def test_list_oil_gas_field_sources_page_rejects_a_bare_string_source(
     source: str | bytes,
 ) -> None:
-    """A bare string is a Sequence, so list("gem") would send source=g&source=e
-    &source=m. The API rejects those as invalid enum values, surfacing a 422 far
-    from the actual mistake -- so refuse before the request."""
     called = False
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1092,7 +1067,6 @@ async def test_list_oil_gas_field_sources_page_rejects_a_bare_string_source(
 
 @pytest.mark.anyio
 async def test_iter_oil_gas_field_sources_rejects_a_bare_string_source() -> None:
-    """The guard reaches the streaming wrapper through the page fetch."""
     called = False
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1115,7 +1089,6 @@ async def test_iter_oil_gas_field_sources_rejects_a_bare_string_source() -> None
 async def test_list_oil_gas_field_sources_page_rejects_out_of_range_page_size(
     page_size: int,
 ) -> None:
-    """The server caps page_size at 200; fail locally instead of on a 422."""
     called = False
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1190,7 +1163,6 @@ async def test_iter_oil_gas_field_sources_streams_items_across_pages() -> None:
 
 @pytest.mark.anyio
 async def test_iter_oil_gas_field_sources_forwards_source_on_every_page() -> None:
-    """The source filter must survive into page 2+, not just the first request."""
     captured: list[list[str]] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1222,7 +1194,6 @@ async def test_iter_oil_gas_field_sources_forwards_source_on_every_page() -> Non
 
 @pytest.mark.anyio
 async def test_iter_oil_gas_field_sources_yields_nothing_when_empty() -> None:
-    """An empty first page ends the walk without a second request."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1250,7 +1221,6 @@ async def test_iter_oil_gas_field_sources_yields_nothing_when_empty() -> None:
 
 @pytest.mark.anyio
 async def test_iter_oil_gas_field_sources_stops_on_short_page() -> None:
-    """Terminates on a short page even when total_pages is absent."""
     calls: list[int] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1276,7 +1246,6 @@ async def test_iter_oil_gas_field_sources_stops_on_short_page() -> None:
 
 @pytest.mark.anyio
 async def test_list_oil_gas_field_sources_page_raises_on_forbidden() -> None:
-    """A token carrying no source:read:<key> gets a 403 the caller can branch on."""
     detail = "Missing required permission(s): source:read:gem"
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -1295,7 +1264,6 @@ async def test_list_oil_gas_field_sources_page_raises_on_forbidden() -> None:
 
 @pytest.mark.anyio
 async def test_iter_oil_gas_field_sources_propagates_forbidden() -> None:
-    """The 403 surfaces on first iteration rather than as an empty stream."""
 
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(403, json={"detail": "Missing required permission(s)"})
@@ -1340,7 +1308,6 @@ def _retry_client(
     *,
     max_attempts: int = 3,
 ) -> tuple[AsyncStitchClient, httpx.AsyncClient]:
-    """Build a client whose transport runs ``handler`` with zero backoff delay."""
     raw_client = httpx.AsyncClient(
         transport=httpx.MockTransport(handler),
         base_url="http://example.test/api/v1",

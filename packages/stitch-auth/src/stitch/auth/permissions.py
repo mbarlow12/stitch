@@ -1,5 +1,3 @@
-"""Shared Stitch permission constants and exact-match helpers."""
-
 from __future__ import annotations
 
 import logging
@@ -127,21 +125,6 @@ def check_permissions(
     check: Literal["all", "any"] = "all",
     exc_handler: Callable[[InsufficientPermissionsError], NoReturn] | None = None,
 ) -> None:
-    """Verify that granted permissions satisfy required permissions.
-
-    Args:
-        granted: Permissions granted to the caller.
-        required: Permissions required for the protected operation.
-        check: Whether all required permissions or any required permission must be
-            granted.
-        exc_handler: Optional callback for mapping permission failures to a
-            caller-specific exception. This callback should raise an exception.
-
-    Raises:
-        ValueError: If check is not "all" or "any".
-        InsufficientPermissionsError: If the required permissions are not
-            satisfied and exc_handler does not raise its own exception.
-    """
     if check not in {"all", "any"}:
         msg = f"unsupported permission check mode: {check!r}"
         raise ValueError(msg)

@@ -58,17 +58,8 @@ class AsyncStitchClient:
                 f"backoff_base_seconds must be >= 0, got {backoff_base_seconds}"
             )
         self._headers_provider = headers_provider
-        # Bounded exponential-backoff retry for transient failures (see
-        # ``_request_with_retry``). ``max_attempts`` is the total number of tries
-        # per request -- ``1`` disables retries. Applies whether the httpx client
-        # is owned or injected, so retry behaviour is exercised in tests too.
         self._max_attempts = max_attempts
         self._backoff_base_seconds = backoff_base_seconds
-        # HTTP statuses to treat as transient and retry (e.g. ``{429, 503}``).
-        # Empty by default, so a completed response fast-fails unless a caller
-        # opts in -- a bulk poster wants 429/5xx retried, an interactive caller
-        # usually does not. Transport failures are retried independently of this
-        # (see ``_transport_error_is_retryable``).
         self._retry_statuses = frozenset(retry_statuses)
         self._owns_client = client is None
         if client is not None:
@@ -148,12 +139,6 @@ class AsyncStitchClient:
         name: str | None = None,
         country: str | None = None,
     ) -> dict[str, Any]:
-        """One page of Oil & Gas Field resources.
-
-        Raises:
-            ValueError: if ``page``/``page_size`` are out of range.
-            StitchAPIError: on a non-2xx response.
-        """
         self._validate_page_params(page, page_size)
         params: dict[str, Any] = {"page": page, "page_size": page_size}
         if q is not None:
@@ -180,13 +165,6 @@ class AsyncStitchClient:
         name: str | None = None,
         country: str | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Yield oil-gas-field items one page at a time.
-
-        Bounded-memory counterpart to :meth:`collect_oil_gas_fields`: only a
-        single page is held in memory at once, so callers can stream the whole
-        result set without materializing it. Page-termination logic mirrors
-        ``collect_oil_gas_fields``.
-        """
         pages_fetched = 0
         page = start_page
 
@@ -278,59 +256,21 @@ class AsyncStitchClient:
         page_size: int = 50,
         source: Sequence[OGSISrcKey] | None = None,
     ) -> dict[str, Any]:
-        """One page of Oil & Gas Field *source* records.
-
-        Unlike :meth:`list_oil_gas_fields_page`, each item is a flat source view
-        -- every business field plus ``id`` and ``source`` -- not an
-        ``{"id": ..., "data": {...}}`` resource envelope. ``source_record`` is
-        never included; use the per-id detail route for that.
-
-        Only sources reachable through an ACTIVE membership on a live
-        (non-merged) resource are listed, so absence from this result does not
-        prove a source is absent from the database.
-
-        Args:
-            page: 1-based page number.
-            page_size: rows per page, 1..``MAX_PAGE_SIZE``.
-            source: restrict to these source keys; omit for every licensed
-                source. Note a token holding only *some* ``source:read:<key>``
-                permissions gets a 200 with the unlicensed rows silently
-                dropped -- only a token holding *none* of them gets a 403.
-
-        Raises:
-            TypeError: if ``source`` is a bare string rather than a sequence.
-            ValueError: if ``page``/``page_size`` are out of range, or ``source``
-                is an empty sequence.
-            StitchAPIError: on a non-2xx response (403 when the token holds no
-                ``source:read:<key>`` permission at all).
-        """
         self._validate_page_params(page, page_size)
         params: dict[str, Any] = {
             "page": page,
             "page_size": page_size,
-            # Stable forward scan. The route defaults to name-ascending, under
-            # which a concurrent insert can land behind the paging cursor and
-            # shift every later page, silently skipping rows. Sorting on the
-            # source id makes new rows append past the last page instead.
-            # As such, `sort_by` and `sort_order` are deliberately NOT overrideable
             "sort_by": "id",
             "sort_order": "asc",
         }
         if source is not None:
             if isinstance(source, (str, bytes)):
-                # A bare string is itself a Sequence, so list("gem") would
-                # expand to ["g", "e", "m"] and the request would go out as
-                # source=g&source=e&source=m. The API rejects those as invalid
-                # enum values, so the 422 surfaces far from the actual typo.
                 raise TypeError(
                     "source must be a sequence of source keys, not a bare "
                     f"{type(source).__name__} (did you mean [{source!r}]?)"
                 )
             source_keys = list(source)
             if not source_keys:
-                # httpx drops an empty sequence from the query string entirely,
-                # which the API reads as "no filter" -- i.e. every source, the
-                # exact opposite of what the caller asked for.
                 raise ValueError("source must not be empty when provided")
             params["source"] = source_keys
         payload = await self._request_json(
@@ -349,12 +289,6 @@ class AsyncStitchClient:
         max_pages: int | None = None,
         source: Sequence[OGSISrcKey] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
-        """Yield Oil & Gas Field source records one page at a time.
-
-        Bounded-memory full scan: only a single page is held in memory at once,
-        so callers can fold the whole result set without materializing it.
-        Page-termination logic mirrors :meth:`iter_oil_gas_fields`.
-        """
         pages_fetched = 0
         page = start_page
 
@@ -456,9 +390,6 @@ class AsyncStitchClient:
             params=params,
             json=json,
         )
-        # A non-retryable status (or one whose retries were exhausted) raises
-        # here: the retry loop returns the completed response and lets this map
-        # it to a ``StitchAPIError``.
         self._raise_for_status(response, operation)
         return response.json()
 
@@ -471,23 +402,6 @@ class AsyncStitchClient:
         params: Mapping[str, Any] | None,
         json: Mapping[str, Any] | None,
     ) -> httpx.Response:
-        """Send one request, retrying transient failures with bounded backoff.
-
-        Two kinds are retried: transport failures (``httpx.TransportError`` and
-        ``OSError``), and -- when the caller opted in via ``retry_statuses`` -- a
-        completed response carrying one of those statuses (e.g. 429/503), which
-        honours a ``Retry-After`` header when present and otherwise the
-        exponential backoff.
-
-        Both are gated on idempotency so a non-idempotent POST is never
-        duplicated. A listed status ``>= 500`` (which may follow a side effect
-        the server already applied) is retried only on an idempotent method (see
-        ``_IDEMPOTENT_METHODS``); a transport failure is retried on any method
-        only when the request provably never reached the server (see
-        ``_UNSENT_TRANSPORT_ERRORS``), and otherwise only on an idempotent
-        method. Any other exception propagates, and any non-retried status is
-        returned for the caller to raise on.
-        """
         for attempt in range(1, self._max_attempts + 1):
             try:
                 response = await self._client.request(
@@ -535,30 +449,15 @@ class AsyncStitchClient:
                 self._max_attempts,
             )
             await asyncio.sleep(delay)
-        # Unreachable: the loop either returns a response or re-raises on the
-        # final attempt, but keeps the type checker satisfied.
         raise RuntimeError(f"{operation} exhausted retries without a response")
 
     @staticmethod
     def _transport_error_is_retryable(method: str, exc: Exception) -> bool:
-        """Whether a transport failure may be safely retried.
-
-        Connect-phase failures (``_UNSENT_TRANSPORT_ERRORS``) never reached the
-        server, so they retry on any method. Every other transport error may have
-        been applied before the failure, so it retries only on an idempotent
-        method -- a non-idempotent POST is not re-sent.
-        """
         if isinstance(exc, _UNSENT_TRANSPORT_ERRORS):
             return True
         return method.upper() in _IDEMPOTENT_METHODS
 
     def _should_retry_status(self, method: str, status_code: int) -> bool:
-        """Whether a completed response's status should be retried.
-
-        The status must be opted in via ``retry_statuses``. A ``>= 500`` status
-        is additionally gated on an idempotent method, so a non-idempotent POST
-        is never retried on a 5xx that may have already taken effect.
-        """
         if status_code not in self._retry_statuses:
             return False
         if status_code >= 500 and method.upper() not in _IDEMPOTENT_METHODS:
@@ -567,13 +466,6 @@ class AsyncStitchClient:
 
     @staticmethod
     def _retry_after_seconds(response: httpx.Response) -> float | None:
-        """Seconds to wait per a ``Retry-After`` header, or None if unusable.
-
-        Only the delta-seconds form (``Retry-After: 5``) is honoured; the
-        HTTP-date form is ignored (falls back to backoff) to avoid depending on
-        client/server clock agreement. A negative or non-numeric value is
-        likewise ignored.
-        """
         value = response.headers.get("Retry-After")
         if value is None:
             return None
@@ -584,11 +476,6 @@ class AsyncStitchClient:
 
     @staticmethod
     def _validate_page_params(page: int, page_size: int) -> None:
-        """Reject out-of-range pagination locally rather than on a server 422.
-
-        Applied by every paging entry point, so the ``iter_``/``collect_``
-        wrappers inherit it through the page fetch they delegate to.
-        """
         if page < 1:
             raise ValueError(f"page must be >= 1, got {page}")
         if not 1 <= page_size <= MAX_PAGE_SIZE:

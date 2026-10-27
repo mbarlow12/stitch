@@ -1,5 +1,3 @@
-"""Unit tests for JWTValidator with mocked JWKS."""
-
 import time
 
 import jwt as pyjwt
@@ -11,12 +9,9 @@ from stitch.auth.validator import JWTValidator
 
 
 class TestJWTValidatorHappyPath:
-    """Successful token validation scenarios."""
-
     def test_validates_token_returns_claims(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Valid token produces TokenClaims with correct fields."""
         token = token_factory(
             sub="auth0|abc123",
             email="user@example.com",
@@ -34,7 +29,6 @@ class TestJWTValidatorHappyPath:
     def test_email_fallback_to_preferred_username(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """When email claim is absent, falls back to preferred_username."""
         token = token_factory(
             email=None,
             extra_claims={"preferred_username": "user@tenant.onmicrosoft.com"},
@@ -48,7 +42,6 @@ class TestJWTValidatorHappyPath:
     def test_invalid_preferred_username_does_not_become_email(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Non-email preferred_username is ignored for email fallback."""
         token = token_factory(
             email=None,
             extra_claims={"preferred_username": "not-an-email"},
@@ -62,7 +55,6 @@ class TestJWTValidatorHappyPath:
     def test_invalid_email_claim_falls_back_to_valid_preferred_username(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Fallback still works when the email claim itself is malformed."""
         token = token_factory(
             email="bad-email",
             extra_claims={"preferred_username": "user@tenant.onmicrosoft.com"},
@@ -76,7 +68,6 @@ class TestJWTValidatorHappyPath:
     def test_optional_claims_can_be_absent(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """email and name are optional."""
         token = token_factory(email=None, name=None)
         validator = JWTValidator(oidc_settings)
 
@@ -89,7 +80,6 @@ class TestJWTValidatorHappyPath:
     def test_raw_contains_full_payload(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """raw dict contains the complete JWT payload."""
         token = token_factory(
             extra_claims={"given_name": "Jane", "family_name": "Doe"},
         )
@@ -101,7 +91,6 @@ class TestJWTValidatorHappyPath:
         assert claims.raw["family_name"] == "Doe"
 
     def test_uuid_sub_format(self, oidc_settings, mock_jwks_client, token_factory):
-        """Entra ID-style UUID sub is treated as opaque string."""
         token = token_factory(sub="550e8400-e29b-41d4-a716-446655440000")
         validator = JWTValidator(oidc_settings)
 
@@ -112,7 +101,6 @@ class TestJWTValidatorHappyPath:
     def test_token_without_nbf_validates(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Token missing nbf claim (e.g. Auth0 default) validates successfully."""
         token = token_factory(include_nbf=False)
         validator = JWTValidator(oidc_settings)
 
@@ -122,12 +110,9 @@ class TestJWTValidatorHappyPath:
 
 
 class TestJWTValidatorErrors:
-    """Error handling and exception mapping."""
-
     def test_expired_token_raises_token_expired_error(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Expired token raises TokenExpiredError."""
         token = token_factory(exp=int(time.time()) - 3600)
         validator = JWTValidator(oidc_settings)
 
@@ -137,7 +122,6 @@ class TestJWTValidatorErrors:
     def test_wrong_audience_raises_token_validation_error(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Mismatched audience raises TokenValidationError."""
         token = token_factory(aud="https://wrong-audience.example.com")
         validator = JWTValidator(oidc_settings)
 
@@ -147,7 +131,6 @@ class TestJWTValidatorErrors:
     def test_wrong_issuer_raises_token_validation_error(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Mismatched issuer raises TokenValidationError."""
         token = token_factory(iss="https://wrong-issuer.example.com/")
         validator = JWTValidator(oidc_settings)
 
@@ -155,7 +138,6 @@ class TestJWTValidatorErrors:
             validator.validate(token)
 
     def test_jwks_fetch_error(self, oidc_settings, mock_jwks_client):
-        """JWKS client error raises JWKSFetchError."""
         mock_jwks_client.get_signing_key_from_jwt.side_effect = pyjwt.PyJWKClientError(
             "Connection refused"
         )
@@ -165,7 +147,6 @@ class TestJWTValidatorErrors:
             validator.validate("some.invalid.token")
 
     def test_jwks_connection_error(self, oidc_settings, mock_jwks_client):
-        """JWKS connection error raises JWKSFetchError."""
         mock_jwks_client.get_signing_key_from_jwt.side_effect = (
             pyjwt.PyJWKClientConnectionError("Timeout")
         )
@@ -177,7 +158,6 @@ class TestJWTValidatorErrors:
     def test_nbf_in_future_raises_token_validation_error(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
-        """Token not yet valid (nbf in future) raises TokenValidationError."""
         token = token_factory(nbf=int(time.time()) + 3600)
         validator = JWTValidator(oidc_settings)
 
@@ -187,7 +167,6 @@ class TestJWTValidatorErrors:
     def test_tampered_token_raises_token_validation_error(
         self, oidc_settings, mock_jwks_client, token_factory, rsa_private_key_pem
     ):
-        """Token signed with wrong key raises TokenValidationError."""
         from cryptography.hazmat.primitives.asymmetric import rsa as rsa_mod
         from cryptography.hazmat.primitives import serialization
 
@@ -218,8 +197,6 @@ class TestJWTValidatorErrors:
 
 
 class TestJWTValidatorPermissions:
-    """Extraction of the Auth0 RBAC `permissions` claim (rfc9068_profile_authz)."""
-
     def test_extracts_permissions_when_present(
         self, oidc_settings, mock_jwks_client, token_factory
     ):

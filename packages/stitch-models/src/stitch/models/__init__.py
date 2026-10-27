@@ -28,19 +28,10 @@ class SourceRecord(BaseModel):
 
 
 class Source[TId: IdType, TSrcKey: str](BaseModel):
-    """Base class for dependent, canonical `Source` data declarations.
-
-    Used for creational patterns and to handle use cases where identifiers should NOT be present.
-
-    Attributes:
-        source: key for identifying the data source
-    """
-
     id: TId | None = None
     source: TSrcKey
     source_record: SourceRecord
 
-    # we set `from_attributes=True` to accommodate ORM or other object mappings
     model_config: ClassVar[ConfigDict] = ConfigDict(
         from_attributes=True, extra="ignore"
     )
@@ -51,12 +42,6 @@ class SourceView[TId: IdType, TSrcKey: str](Source[TId, TSrcKey]):
 
 
 class SourcePayload(BaseModel):
-    """Base for domain-specific source payload containers.
-
-    Subclass and declare attributes that hold collections (for example, mappings)
-    of :class:`Source` instances keyed and structured as appropriate for your domain.
-    """
-
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 

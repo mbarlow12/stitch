@@ -56,7 +56,6 @@ def test_resource_attributes_filter_stamps_record() -> None:
 
 
 def test_resource_attributes_filter_does_not_clobber_existing() -> None:
-    # A per-event value (e.g. via extra=) wins over the static resource tag.
     record = _record(**{"deployment.name": "per-event"})
     ResourceAttributesFilter({"deployment.name": "static"}).filter(record)
     assert getattr(record, "deployment.name") == "per-event"
@@ -78,8 +77,6 @@ def test_json_formatter_flattens_event_dict() -> None:
 
 
 def test_json_formatter_event_does_not_clobber_core_keys() -> None:
-    # A stray event key colliding with a core field (ts/level/logger/msg) must
-    # not overwrite it — the core keys define the log schema.
     record = _record(event={"level": "SPOOFED", "msg": "spoofed", "route": "/x"})
     payload = json.loads(JsonFormatter().format(record))
     assert payload["level"] == "INFO"
