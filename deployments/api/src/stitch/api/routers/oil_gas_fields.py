@@ -334,16 +334,22 @@ async def suggest_field_value(
     field: Annotated[AllowedSuggestionField, Query()],
 ) -> FieldSuggestion:
     try:
-        return await llm.suggest_field_value(
+        suggestions = await llm.suggest_missing_field_values(
             session=uow.session,
             resource_id=id,
-            field=field,
+            fields=[field],
             licensed_sources=licensed_sources(claims),
         )
     except LLMConfigurationError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
     except (AzureResponsesError, ModelOutputError) as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+    if not suggestions:
+        raise HTTPException(
+            status_code=404, detail=f"`{field}` already has a value on this resource."
+        )
+    return suggestions[0]
 
 
 @router.get(
