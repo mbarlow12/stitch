@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from enum import StrEnum
@@ -89,7 +88,6 @@ def materialize_value(
 
 
 class OilGasFieldSourceValueModel(Base):
-
     __tablename__ = "oil_gas_field_source_values"
 
     id: Mapped[int] = mapped_column(

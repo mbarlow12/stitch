@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import argparse
@@ -20,8 +19,7 @@ from .state import (
 logger = logging.getLogger(__name__)
 
 
-class ResourceStateRebuildError(RuntimeError):
-    ...
+class ResourceStateRebuildError(RuntimeError): ...
 
 
 def _positive_int(raw: str) -> int:

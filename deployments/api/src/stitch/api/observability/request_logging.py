@@ -1,4 +1,3 @@
-
 from stitch.observability.middleware import RequestContextMiddleware
 
 from .context import db_stats_var, new_db_stats

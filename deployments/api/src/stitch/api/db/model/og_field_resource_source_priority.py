@@ -1,4 +1,3 @@
-
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 from stitch.ogsi.model.types import OGSISrcKey

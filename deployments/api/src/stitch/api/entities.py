@@ -25,8 +25,6 @@ class Timestamped(BaseModel):
     updated: datetime = Field(default_factory=datetime.now)
 
 
-
-
 class User(BaseModel):
     id: int = Field(...)
     sub: str = Field(...)
@@ -95,7 +93,6 @@ SortableField = Literal[
 
 
 class OGFieldFilterParams(BaseModel):
-
     q: str | None = None
     id: int | None = None
     name: str | None = None
@@ -120,7 +117,6 @@ class OGFieldQueryParams(PaginationParams, OGFieldFilterParams, OGFieldSortParam
 
 
 class OGFieldFilterOptionsResponse(BaseModel):
-
     basin: list[str]
     country: list[str]
     field_status: list[str]
@@ -154,7 +150,6 @@ class MergeCandidateReviewRequest(BaseModel):
 
 
 class SetFieldPriorityRequest(BaseModel):
-
     ordered_source_pks: list[int]
 
 
@@ -173,12 +168,10 @@ class MergeCandidateView(BaseModel):
 
 
 class ComparisonValueView(OGFieldSourceValueView):
-
     resource_id: int
 
 
 class FieldComparisonView(BaseModel):
-
     field: str
     status: Literal["match", "different"]
     values: list[ComparisonValueView]

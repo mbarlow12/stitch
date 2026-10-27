@@ -1,4 +1,3 @@
-
 from typing import cast, get_args
 
 from stitch.auth import TokenClaims
