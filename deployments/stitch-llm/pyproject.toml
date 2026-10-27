@@ -2,7 +2,6 @@
 name = "stitch-llm"
 version = "0.1.0"
 description = "LLM-assisted Stitch API companion service"
-readme = "README.md"
 authors = [{ name = "RMI", email = "stitch@rmi.org" }]
 requires-python = ">=3.12.12"
 dependencies = [
