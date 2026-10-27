@@ -1,7 +1,9 @@
 import json
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
+from pytest_mock import MockerFixture
 from stitch.ogsi.model import GemSourceView, OGFieldDetailView
 from stitch.ogsi.model.og_field import OilGasFieldBase
 
@@ -31,95 +33,64 @@ def _detail_view() -> OGFieldDetailView:
     )
 
 
-def _response_payload(
+def _canned_result(
     *, value: str, rationale: str, annotations: list[dict[str, Any]]
-) -> dict[str, Any]:
-    return {
-        "model": "gpt-test",
-        "output": [
-            {
-                "content": [
-                    {
-                        "type": "output_text",
-                        "text": f"VALUE: {value}\nRATIONALE: {rationale}",
-                        "annotations": annotations,
-                    }
-                ]
-            }
-        ],
-    }
-
-
-class _RecordingClient:
-    def __init__(self, recorder: dict[str, Any], payload: dict[str, Any]) -> None:
-        self._recorder = recorder
-        self._payload = payload
-
-    async def __aenter__(self) -> "_RecordingClient":
-        return self
-
-    async def __aexit__(self, exc_type, exc, tb) -> None:
-        return None
-
-    async def generate_field_suggestion(
-        self, *, input_messages: list[dict[str, str]]
-    ) -> llm.AzureResponsesResult:
-        self._recorder["input_messages"] = input_messages
-        return llm.AzureResponsesResult(
-            output_text=self._payload["output"][0]["content"][0]["text"],
-            model=self._payload["model"],
-            response_payload=self._payload,
-        )
+) -> llm.AzureResponsesResult:
+    output_text = f"VALUE: {value}\nRATIONALE: {rationale}"
+    return llm.AzureResponsesResult(
+        output_text=output_text,
+        model="gpt-test",
+        response_payload={
+            "model": "gpt-test",
+            "output": [
+                {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": output_text,
+                            "annotations": annotations,
+                        }
+                    ]
+                }
+            ],
+        },
+    )
 
 
 @pytest.fixture
-def recorder() -> dict[str, Any]:
-    return {}
+def load_context(mocker: MockerFixture) -> AsyncMock:
+    return mocker.patch.object(
+        llm, "load_suggestion_context", return_value=_detail_view()
+    )
 
 
 @pytest.fixture
-def patched_llm(monkeypatch, recorder):
-    detail_view = _detail_view()
-
-    async def fake_load_suggestion_context(
-        *, session, resource_id, licensed_sources=None
-    ) -> OGFieldDetailView:
-        recorder["load_args"] = {
-            "session": session,
-            "resource_id": resource_id,
-            "licensed_sources": licensed_sources,
-        }
-        return detail_view
-
-    monkeypatch.setattr(llm, "load_suggestion_context", fake_load_suggestion_context)
-
-    def install(payload: dict[str, Any]) -> None:
-        monkeypatch.setattr(
-            llm,
-            "AzureResponsesClient",
-            lambda *args, **kwargs: _RecordingClient(recorder, payload),
-        )
-
-    return install
+def azure_client(mocker: MockerFixture) -> AsyncMock:
+    factory = mocker.patch.object(llm, "AzureResponsesClient")
+    return factory.return_value.__aenter__.return_value
 
 
 @pytest.mark.anyio
-async def test_builds_prompt_from_detail_view(mock_session, patched_llm, recorder):
-    patched_llm(
-        _response_payload(
-            value="Permian",
-            rationale="The sources agree.",
-            annotations=[
-                {"type": "url_citation", "url": "https://example.com/a", "title": "A"}
-            ],
-        )
+async def test_builds_prompt_from_detail_view(
+    mocker: MockerFixture, mock_session, load_context, azure_client
+):
+    build_prompt = mocker.spy(llm, "build_field_suggestion_input")
+    azure_client.generate_field_suggestion.return_value = _canned_result(
+        value="Permian",
+        rationale="The sources agree.",
+        annotations=[
+            {"type": "url_citation", "url": "https://example.com/a", "title": "A"}
+        ],
     )
 
     await llm.suggest_field_value(
         session=mock_session, resource_id=RESOURCE_ID, field="basin"
     )
 
-    system_message, user_message = recorder["input_messages"]
+    sent = azure_client.generate_field_suggestion.await_args.kwargs["input_messages"]
+    assert sent == build_prompt.spy_return
+
+    system_message, user_message = build_prompt.spy_return
     assert system_message["role"] == "system"
     assert "VALUE: <value or null>" in system_message["content"]
     assert "RATIONALE: <one short sentence>" in system_message["content"]
@@ -135,19 +106,19 @@ async def test_builds_prompt_from_detail_view(mock_session, patched_llm, recorde
 
 
 @pytest.mark.anyio
-async def test_returns_value_citations_and_model(mock_session, patched_llm):
-    patched_llm(
-        _response_payload(
-            value="Midland",
-            rationale="Public sources name the Midland basin.",
-            annotations=[
-                {
-                    "type": "url_citation",
-                    "url": "https://example.com/basin",
-                    "title": "Basin report",
-                }
-            ],
-        )
+async def test_returns_value_citations_and_model(
+    mock_session, load_context, azure_client
+):
+    azure_client.generate_field_suggestion.return_value = _canned_result(
+        value="Midland",
+        rationale="Public sources name the Midland basin.",
+        annotations=[
+            {
+                "type": "url_citation",
+                "url": "https://example.com/basin",
+                "title": "Basin report",
+            }
+        ],
     )
 
     suggestion = await llm.suggest_field_value(
@@ -163,13 +134,11 @@ async def test_returns_value_citations_and_model(mock_session, patched_llm):
 
 
 @pytest.mark.anyio
-async def test_uncited_value_is_dropped(mock_session, patched_llm):
-    patched_llm(
-        _response_payload(
-            value="Midland",
-            rationale="No public evidence was found.",
-            annotations=[],
-        )
+async def test_uncited_value_is_dropped(mock_session, load_context, azure_client):
+    azure_client.generate_field_suggestion.return_value = _canned_result(
+        value="Midland",
+        rationale="No public evidence was found.",
+        annotations=[],
     )
 
     suggestion = await llm.suggest_field_value(
@@ -181,13 +150,13 @@ async def test_uncited_value_is_dropped(mock_session, patched_llm):
 
 
 @pytest.mark.anyio
-async def test_out_of_vocabulary_enum_value_is_rejected(mock_session, patched_llm):
-    patched_llm(
-        _response_payload(
-            value="definitely-not-a-status",
-            rationale="The model invented a status.",
-            annotations=[{"type": "url_citation", "url": "https://example.com/status"}],
-        )
+async def test_out_of_vocabulary_enum_value_is_rejected(
+    mock_session, load_context, azure_client
+):
+    azure_client.generate_field_suggestion.return_value = _canned_result(
+        value="definitely-not-a-status",
+        rationale="The model invented a status.",
+        annotations=[{"type": "url_citation", "url": "https://example.com/status"}],
     )
 
     with pytest.raises(llm.ModelOutputError):

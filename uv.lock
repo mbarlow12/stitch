@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -11,6 +11,7 @@ resolution-markers = [
 members = [
     "stitch",
     "stitch-api",
+    "stitch-app",
     "stitch-auth",
     "stitch-client",
     "stitch-llm",
@@ -1065,6 +1066,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-mock"
+version = "3.17.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/97/c2/28b9f5b955ff2bcd4727a6f768e2ca9b586cd7c37b95ea5f7b9b873ac7b3/pytest_mock-3.17.0.tar.gz", hash = "sha256:e36576e0985e01027e999891e7a966c67822d40c89ef1b4c8b6e22737e3590b4", size = 43064, upload-time = "2026-10-17T16:21:42.435Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/ea/47fbdc8f37410956fd445720e927589b1e2a47772c5f28109f0ce2fa26d9/pytest_mock-3.17.0-py3-none-any.whl", hash = "sha256:1b82aa4b37137248bd687055e109723debeb07b489de1565297dc9589c5f2d6b", size = 11248, upload-time = "2026-10-17T16:21:41.265Z" },
+]
+
+[[package]]
 name = "python-dotenv"
 version = "1.2.2"
 source = { registry = "https://pypi.org/simple" }
@@ -1275,6 +1288,7 @@ dependencies = [
     { name = "alembic" },
     { name = "fastapi", extra = ["standard-no-fastapi-cloud-cli"] },
     { name = "greenlet" },
+    { name = "httpx" },
     { name = "opentelemetry-sdk" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
@@ -1292,6 +1306,7 @@ dev = [
     { name = "polyfactory" },
     { name = "pytest" },
     { name = "pytest-anyio" },
+    { name = "pytest-mock" },
 ]
 
 [package.metadata]
@@ -1299,6 +1314,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.19.1" },
     { name = "fastapi", extras = ["standard-no-fastapi-cloud-cli"], specifier = ">=0.141.1" },
     { name = "greenlet", specifier = ">=3.5.5" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "opentelemetry-sdk", specifier = ">=1.30.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.4" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
@@ -1316,7 +1332,13 @@ dev = [
     { name = "polyfactory", specifier = ">=3.3.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-anyio", specifier = ">=0.0.0" },
+    { name = "pytest-mock", specifier = ">=3.17.0" },
 ]
+
+[[package]]
+name = "stitch-app"
+version = "0.1.0"
+source = { editable = "packages/stitch-app" }
 
 [[package]]
 name = "stitch-auth"

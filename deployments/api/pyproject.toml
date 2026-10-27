@@ -16,6 +16,7 @@ dependencies = [
   "stitch-models",
   "stitch-observability[asgi]",
   "stitch-ogsi",
+  "httpx>=0.28.1",
 ]
 
 [build-system]
@@ -32,6 +33,7 @@ dev = [
   "aiosqlite>=0.21.0",
   "httpx>=0.28.0",
   "polyfactory>=3.3.0",
+  "pytest-mock>=3.17.0",
 ]
 
 [tool.pytest.ini_options]

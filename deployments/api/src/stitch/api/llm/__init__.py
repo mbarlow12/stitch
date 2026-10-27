@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Collection
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from stitch.api.db import og_field_resource_actions
 from stitch.api.db.utils import resource_to_detail_view
 
 __all__ = [
+    "ALL_SUGGESTION_FIELDS",
     "AllowedSuggestionField",
     "AzureResponsesError",
     "Citation",
@@ -41,6 +43,7 @@ __all__ = [
     "ModelOutputError",
     "load_suggestion_context",
     "suggest_field_value",
+    "suggest_missing_field_values",
 ]
 
 
@@ -153,6 +156,10 @@ AllowedSuggestionField = Literal[
     "primary_hydrocarbon_group",
     "production_conventionality",
 ]
+
+ALL_SUGGESTION_FIELDS: tuple[AllowedSuggestionField, ...] = get_args(
+    AllowedSuggestionField
+)
 
 STRING_FIELDS = frozenset(
     {
@@ -471,29 +478,23 @@ def extract_public_citations(body: dict[str, Any]) -> list[Citation]:
     return citations
 
 
-async def suggest_field_value(
+async def _suggest_from_context(
     *,
-    session: AsyncSession,
+    llm_client: AzureResponsesClient,
     resource_id: int,
     field: AllowedSuggestionField,
-    licensed_sources: Collection[OGSISrcKey] | None = None,
+    detail_view: OGFieldDetailView,
 ) -> FieldSuggestion:
     observed_at = datetime.now(UTC)
-    detail_view = await load_suggestion_context(
-        session=session,
-        resource_id=resource_id,
-        licensed_sources=licensed_sources,
-    )
     input_messages = build_field_suggestion_input(
         resource_id=resource_id,
         field=field,
         detail_view=detail_view,
     )
 
-    async with AzureResponsesClient() as llm_client:
-        llm_result = await llm_client.generate_field_suggestion(
-            input_messages=input_messages
-        )
+    llm_result = await llm_client.generate_field_suggestion(
+        input_messages=input_messages
+    )
 
     parsed = parse_field_suggestion_response(llm_result.output_text)
     citations = extract_public_citations(llm_result.response_payload)
@@ -516,3 +517,63 @@ async def suggest_field_value(
         rationale=parsed.rationale,
         observed_at=observed_at,
     )
+
+
+async def suggest_field_value(
+    *,
+    session: AsyncSession,
+    resource_id: int,
+    field: AllowedSuggestionField,
+    licensed_sources: Collection[OGSISrcKey] | None = None,
+) -> FieldSuggestion:
+    detail_view = await load_suggestion_context(
+        session=session,
+        resource_id=resource_id,
+        licensed_sources=licensed_sources,
+    )
+
+    async with AzureResponsesClient() as llm_client:
+        return await _suggest_from_context(
+            llm_client=llm_client,
+            resource_id=resource_id,
+            field=field,
+            detail_view=detail_view,
+        )
+
+
+async def suggest_missing_field_values(
+    *,
+    session: AsyncSession,
+    resource_id: int,
+    fields: Collection[AllowedSuggestionField] = ALL_SUGGESTION_FIELDS,
+    licensed_sources: Collection[OGSISrcKey] | None = None,
+) -> list[FieldSuggestion]:
+    detail_view = await load_suggestion_context(
+        session=session,
+        resource_id=resource_id,
+        licensed_sources=licensed_sources,
+    )
+
+    requested = set(fields)
+    targets = [
+        field
+        for field in ALL_SUGGESTION_FIELDS
+        if field in requested and getattr(detail_view.data, field) is None
+    ]
+    if not targets:
+        return []
+
+    async with AzureResponsesClient() as llm_client:
+        return list(
+            await asyncio.gather(
+                *(
+                    _suggest_from_context(
+                        llm_client=llm_client,
+                        resource_id=resource_id,
+                        field=field,
+                        detail_view=detail_view,
+                    )
+                    for field in targets
+                )
+            )
+        )
