@@ -50,6 +50,24 @@ uv run --package stitch-tasks --active pytest packages/stitch-tasks
 uv run --package stitch-tasks --active pytest packages/stitch-tasks/tests/test_x.py::test_name
 ```
 
+### Dependencies
+
+Every `uv` invocation that acts on this package names it explicitly with `--package stitch-tasks`,
+and then runs correctly from anywhere in the workspace. Without the flag `uv` resolves against the
+root project and edits the wrong `pyproject.toml`.
+
+```bash
+uv add --package stitch-tasks <dep>
+uv add --package stitch-tasks --dev <dep>
+uv remove --package stitch-tasks <dep>
+uv sync --package stitch-tasks
+uv tree --package stitch-tasks
+uv build --package stitch-tasks
+```
+
+Never hand-edit the dependency arrays in `pyproject.toml`. Going through `uv` is what keeps
+`uv.lock` in sync.
+
 ## Layout and conventions
 
 - **`src/stitch_tasks/tasks.py`** is the public surface: a module-level `TaskCollection` named
@@ -82,8 +100,6 @@ Two rules that bite:
 - **Compose, never shell out.** Use `deps`, `uses`, `ref`, or a `sequence`/`parallel` to run one
   task from another. `cmd = "poe other-task"` spawns a second poe process, hides the dependency from
   poe's graph, and cannot reach private `_`-prefixed tasks.
-
-Do not hand-edit dependency arrays in `pyproject.toml`; use `uv add` so `uv.lock` stays in sync.
 
 ## Workspace facts worth knowing
 

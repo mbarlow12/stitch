@@ -16,11 +16,15 @@ members = [
   "packages/stitch-observability",
   "packages/stitch-ogsi",
   "packages/stitch-app",
+  "packages/stitch-tasks",
 ]
 
 [tool.uv.sources]
 stitch-auth = { workspace = true }
 stitch-client = { workspace = true }
+
+[tool.poe]
+include_script = "stitch_tasks.tasks:tasks"
 
 [dependency-groups]
 dev = ["pytest>=9.1.1", "ruff>=0.16.4"]
