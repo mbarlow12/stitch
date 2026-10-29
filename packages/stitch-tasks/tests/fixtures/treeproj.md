@@ -4,12 +4,6 @@
 
 **7: `VERSION: str`**
 
-**10: `class Widget`**
-
-**11: `Widget.__init__(name: str) -> None`**
-
-**14: `Widget.render() -> str`**
-
 ## src/treepkg/core.py
 
 **6: `build(name: str, *, count: int = 1) -> Widget`**

@@ -5,7 +5,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from griffe import Alias, AliasResolutionError, Attribute, Class, Function, Kind, load
+from griffe import Alias, Attribute, Class, Function, Kind, load
 
 from ._target import resolve_target
 
@@ -46,15 +46,11 @@ def public_members(
 ) -> Iterator[tuple[int, Object | Alias]]:
     found: list[tuple[int, Object | Alias]] = []
     for member in parent.members.values():
-        if not member.is_public or member.kind not in kinds:
+        if isinstance(member, Alias) or not member.is_public:
             continue
-        try:
-            lineno = member.lineno
-        except AliasResolutionError:
+        if member.kind not in kinds or member.lineno is None:
             continue
-        if lineno is None:
-            continue
-        found.append((lineno, member))
+        found.append((member.lineno, member))
     yield from sorted(found, key=lambda pair: pair[0])
 
 

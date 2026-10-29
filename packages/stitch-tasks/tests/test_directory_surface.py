@@ -53,6 +53,19 @@ def test_modules_without_public_members_are_omitted(surface: str) -> None:
     assert "src/treepkg/sub/deep.py" in surface
 
 
+def test_reexports_are_omitted_from_the_module_that_imports_them(
+    surface: str,
+) -> None:
+    assert "## src/treepkg/__init__.py" in surface
+    assert "VERSION" in surface
+    assert surface.count("class Widget") == 1
+
+
+def test_modules_that_only_reexport_are_omitted(surface: str) -> None:
+    assert "src/treepkg/facade.py" not in surface
+    assert "make" not in surface
+
+
 def test_heading_base_makes_headings_relative_to_it() -> None:
     package = FIXTURES / "treeproj" / "src" / "treepkg"
     surface = directory_surface_markdown(
