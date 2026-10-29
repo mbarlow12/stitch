@@ -1277,7 +1277,6 @@ class TestResourceFilterOptionsAction:
 
 
 class TestResourceFilterOptionsCascade:
-
     async def _seed_two_countries(
         self,
         session: AsyncSession,
