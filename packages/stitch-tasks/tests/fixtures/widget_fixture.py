@@ -1,4 +1,3 @@
-"""Module docstring that must not reach the rendered markdown."""
 
 from __future__ import annotations
 
@@ -28,7 +27,6 @@ __all__ = [
     "stream",
 ]
 
-# A module-level comment that must not survive rendering.
 
 type Coord = tuple[float, float]
 
@@ -43,19 +41,16 @@ def first[T](
         *,
         default: T | None = None,
 ) -> T | None:
-    """Return the first item, or the default when empty."""
     return items[0] if items else default
 
 
 class Box[T]:
-    """Generic single-value container."""
 
     def __init__(self, value: T) -> None:
         self._value = value
 
     @property
     def value(self) -> T:
-        """The wrapped value."""
         return self._value
 
     def replace(self, value: T, /) -> Self:
@@ -73,7 +68,6 @@ def describe(target: str) -> str: ...
 
 
 def describe(target: int | str) -> str:
-    """Describe an int or a str."""
     return str(target)
 
 
@@ -94,7 +88,6 @@ def _(value: int, factor: float = 1.0) -> int:
 
 @contextmanager
 def opened(path: str) -> Generator[str]:
-    """Yield an open handle."""
     yield path
 
 
@@ -104,7 +97,6 @@ async def stream(url: str) -> AsyncGenerator[bytes]:
 
 
 async def fetch(url: str, *, retries: int = 3) -> bytes:
-    """Fetch bytes over the network."""
     return b""
 
 
@@ -118,10 +110,6 @@ def build(
   strict: bool = False,
   **options: str,
 ) -> Widget:
-    """Build a widget.
-
-    The nested helpers below must not surface as top-level symbols.
-    """
 
     def _normalize(raw: str) -> str:
         return raw.strip()
@@ -140,7 +128,6 @@ def never() -> NoReturn:
 
 
 class Renderable(Protocol):
-    """Protocol for things that render themselves."""
 
     def render(self, *, indent: int = 0) -> str: ...
 
@@ -149,13 +136,12 @@ class Renderable(Protocol):
 
 
 class Registry(ABC):
-    """Abstract registry base."""
 
     registry_name: str
 
     @abstractmethod
     def lookup(self, key: str) -> Coord | None:
-        """Look a coordinate up by key."""
+        ...
 
     @staticmethod
     def normalize(key: str) -> str:
@@ -172,7 +158,6 @@ class Registry(ABC):
 
 @dataclass(frozen=True, slots=True)
 class Widget:
-    """A widget with a name and coordinates."""
 
     name: str
     coords: Coord = (0.0, 0.0)

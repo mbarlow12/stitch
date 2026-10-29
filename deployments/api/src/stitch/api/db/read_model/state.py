@@ -86,7 +86,7 @@ async def refresh_resource_states(
         )
         if listable:
             await session.execute(
-                insert(OGFieldResourceState),
+                insert(OGFieldResourceState).execution_options(render_nulls=True),
                 await _compute_state_rows(session, listable),
             )
     return listable

@@ -2,8 +2,16 @@ import FilterDropdown from "./FilterDropdown";
 import { FILTER_FIELDS, EMPTY_FILTERS } from "../config/filters";
 import { useResourceFilterOptions } from "../hooks/useResources";
 
-export default function FilterBar({ endpoint, filters, onFiltersChange }) {
-  const { data: filterOptions } = useResourceFilterOptions(endpoint);
+export default function FilterBar({
+  endpoint,
+  filters,
+  onFiltersChange,
+  optionParams,
+}) {
+  const { data: filterOptions } = useResourceFilterOptions(
+    endpoint,
+    optionParams,
+  );
 
   const chips = FILTER_FIELDS.flatMap(({ key, label, formatValue }) =>
     (filters[key] ?? []).map((value) => ({

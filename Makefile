@@ -246,6 +246,21 @@ reboot-docker-heavy: clean-docker
 follow-stack-logs:
 	$(DOCKER_COMPOSE_DEV) --profile full logs -f
 
+db-restore:
+	@set -eu; \
+	backup_url="$$(scripts/db_restore.sh resolve --backup-url "$(BACKUP_URL)")"; \
+	$(DOCKER_COMPOSE_DEV) stop api seed; \
+	$(DOCKER_COMPOSE_DEV) up --detach --wait db; \
+	echo "Recreating the local database"; \
+	$(DOCKER_COMPOSE_DEV) exec -T db sh -c 'until pg_isready -q -h localhost; do sleep 1; done; dropdb --force --if-exists -U "$$POSTGRES_USER" "$$POSTGRES_DB" && createdb -U "$$POSTGRES_USER" "$$POSTGRES_DB" && sh /docker-entrypoint-initdb.d/00-init-roles.sh'; \
+	PGHOST=host.docker.internal PGPORT=5432 \
+	PGPASSWORD="$$($(DOCKER_COMPOSE_DEV) exec -T db printenv STITCH_MIGRATOR_PASSWORD)" \
+		scripts/db_restore.sh restore \
+		--database "$$($(DOCKER_COMPOSE_DEV) exec -T db printenv POSTGRES_DB)" \
+		--backup-url "$$backup_url"; \
+	$(DOCKER_COMPOSE_DEV) run --rm --build alembic
+
+# Workspace
 .PHONY: check lint test format format-check lock-check
 .PHONY: build-all
 .PHONY: clean clean-build
@@ -271,5 +286,5 @@ follow-stack-logs:
 .PHONY: frontend-format frontend-format-check
 .PHONY: frontend-dev frontend-clean
 
-.PHONY: clean-docker dev-docker reboot-docker reboot-docker-heavy
+.PHONY: clean-docker dev-docker reboot-docker reboot-docker-heavy db-restore
 .PHONY: stack-frontend-dev follow-stack-logs
