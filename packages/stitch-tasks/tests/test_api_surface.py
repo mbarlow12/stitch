@@ -36,18 +36,18 @@ def surface(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> str:
     return api_surface_markdown("fixtpkg")
 
 
-def test_functions_are_h4_headings_with_line_number_and_return_type(
+def test_functions_are_bold_lines_with_line_number_and_return_type(
     surface: str,
 ) -> None:
-    assert "#### 6: `build(name: str, *, count: int = 1) -> str`" in surface
+    assert "**6: `build(name: str, *, count: int = 1) -> str`**" in surface
 
 
-def test_classes_are_h4_headings(surface: str) -> None:
-    assert "#### 9: `class Widget`" in surface
+def test_classes_are_bold_lines(surface: str) -> None:
+    assert "**9: `class Widget`**" in surface
 
 
-def test_public_methods_are_nested_as_h5(surface: str) -> None:
-    assert "##### 10: `render() -> str`" in surface
+def test_public_methods_are_prefixed_with_their_class(surface: str) -> None:
+    assert "**10: `Widget.render() -> str`**" in surface
 
 
 def test_private_and_unexported_names_are_omitted(surface: str) -> None:

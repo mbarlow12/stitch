@@ -8,6 +8,8 @@ __all__ = ["resolve_target"]
 
 def _spec_from_path(path: Path) -> tuple[str, Path]:
     resolved = path.resolve()
+    if resolved.name == "__init__.py":
+        resolved = resolved.parent
     parts = [resolved.stem if resolved.is_file() else resolved.name]
     parent = resolved.parent
     while (parent / "__init__.py").exists():
