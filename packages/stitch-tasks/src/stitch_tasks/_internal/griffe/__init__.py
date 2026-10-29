@@ -70,22 +70,24 @@ def signature_of(obj: Object | Alias) -> str:
 
 
 def _entry(lineno: int, obj: Object | Alias, prefix: str = "") -> str:
-    return f"**{lineno}: `{prefix}{signature_of(obj)}`**"
+    return f"- **{lineno}: `{prefix}{signature_of(obj)}`**"
 
 
 def _member_lines(module: Object | Alias) -> list[str]:
     lines: list[str] = []
     for lineno, member in public_members(module, TOP_LEVEL_KINDS):
-        lines.extend([_entry(lineno, member), ""])
+        lines.extend([_entry(lineno, member)])
         if member.kind is Kind.CLASS:
             for method_lineno, method in public_members(member, (Kind.FUNCTION,)):
-                lines.extend([_entry(method_lineno, method, f"{member.name}."), ""])
+                lines.extend([_entry(method_lineno, method, f"{member.name}.")])
     return lines
 
+def _api_surface_lines(module: Object | Alias) -> list[str]:
+    return [str(module), *_member_lines(module)]
 
 def api_surface_markdown(module_name: str) -> str:
-    module = load(module_name)
-    return "\n".join([f"# {module_name}", "", *_member_lines(module)])
+    _, *memberlines = _api_surface_lines(load(module_name))
+    return "\n".join([f"# {module_name}", "", *memberlines])
 
 
 def _is_excluded(path: Path, directory: Path, patterns: Sequence[str]) -> bool:
@@ -120,9 +122,9 @@ def directory_surface_markdown(
     lines = [f"# {title or root.name}", ""]
     for path in _module_paths(root, patterns):
         name, search_paths = resolve_target(str(path))
-        members = _member_lines(load(name, search_paths=search_paths))
+        modname, *members = _api_surface_lines(load(name, search_paths=search_paths))
         if not members:
             continue
         heading = path.relative_to(base or _package_root(path, root)).as_posix()
-        lines.extend([f"## {heading}", "", *members])
+        lines.extend([f"## {heading}", "", *members, ""])
     return "\n".join(lines)
