@@ -10,14 +10,22 @@ from ._internal.griffe import (
     api_surface_markdown,
     directory_surface_markdown,
 )
-from ._internal.workspace import resolve_package
+from ._internal.workspace import resolve_package, workspace_packages
 
 tasks = TaskCollection()
 
 
-def _surface_args(target: str, target_help: str) -> list[dict]:
+def _surface_args(target: str, target_help: str, required: bool = True) -> list[dict]:
+    positional = {
+        "name": target,
+        "positional": True,
+        "required": required,
+        "help": target_help,
+    }
+    if not required:
+        positional["default"] = ""
     return [
-        {"name": target, "positional": True, "required": True, "help": target_help},
+        positional,
         {
             "name": "output",
             "options": ["-o", "--output"],
@@ -84,23 +92,39 @@ def api_directory(
 
 @tasks.script(
     task_name="api:package",
-    help="Write a package's whole API surface as one markdown file",
+    help="Write each package's whole API surface to its own markdown file",
     task_args=False,
     options={
         "args": [
-            *_surface_args("package", "Installed package name, or a path in one"),
+            *_surface_args(
+                "package",
+                "Installed package name or a path in one; "
+                "defaults to every workspace member",
+                required=False,
+            ),
             *_path_args(),
         ]
     },
     tags=["docs"],
 )
-def api_package(package: str, *, output: str = "", exclude: Sequence[str] = ()) -> None:
-    name, directory = resolve_package(package)
-    _emit(
-        directory_surface_markdown(
-            str(directory), exclude, title=name, heading_base=directory
-        ),
-        output,
-        name,
-        "package",
-    )
+def api_package(
+    package: str = "", *, output: str = "", exclude: Sequence[str] = ()
+) -> None:
+    if package:
+        targets = [resolve_package(package)]
+    elif output:
+        raise ValueError(
+            "--output needs a single package; omit it to write every "
+            "workspace member to docs/"
+        )
+    else:
+        targets = workspace_packages()
+    for name, directory in targets:
+        _emit(
+            directory_surface_markdown(
+                str(directory), exclude, title=name, heading_base=directory
+            ),
+            output,
+            name,
+            "package",
+        )

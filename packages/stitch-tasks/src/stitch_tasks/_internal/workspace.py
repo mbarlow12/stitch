@@ -6,7 +6,7 @@ from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-__all__ = ["resolve_package"]
+__all__ = ["resolve_package", "workspace_packages"]
 
 
 def _load(root: Path) -> dict:
@@ -58,3 +58,32 @@ def resolve_package(target: str) -> tuple[str, Path]:
         )
     name = _load(root).get("project", {}).get("name", root.name)
     return name, _module_dir(root, name)
+
+
+def workspace_packages(start: Path | None = None) -> list[tuple[str, Path]]:
+    """
+    Find every uv workspace member that has a module directory on disk.
+
+    :param start: Directory to search upwards from, defaults to the cwd
+    :return: The name and module directory of each member, ordered by name
+    """
+    base = (start or Path.cwd()).resolve()
+    for candidate in [base, *base.parents]:
+        if not (candidate / "pyproject.toml").is_file():
+            continue
+        workspace = _load(candidate).get("tool", {}).get("uv", {}).get("workspace", {})
+        if not workspace.get("members"):
+            continue
+        excluded = {
+            path
+            for pattern in workspace.get("exclude", [])
+            for path in candidate.glob(pattern)
+        }
+        members = [
+            resolve_package(str(path))
+            for pattern in workspace["members"]
+            for path in sorted(candidate.glob(pattern))
+            if path not in excluded and (path / "pyproject.toml").is_file()
+        ]
+        return sorted({member for member in members if member[1].is_dir()})
+    raise ValueError(f"No uv workspace found at or above {base}")
