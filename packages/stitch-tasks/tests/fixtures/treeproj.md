@@ -20,8 +20,6 @@
 
 **14: `Widget.render() -> str`**
 
-## src/treepkg/sub/__init__.py
-
 ## src/treepkg/sub/deep.py
 
 **6: `dig(depth: int = 1) -> tuple[int, ...]`**

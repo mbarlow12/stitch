@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
     from griffe import Object
 
 __all__ = [
+    "DEFAULT_EXCLUDES",
     "TOP_LEVEL_KINDS",
     "api_surface_markdown",
     "directory_surface_markdown",
@@ -21,6 +23,22 @@ __all__ = [
 ]
 
 TOP_LEVEL_KINDS = (Kind.FUNCTION, Kind.CLASS, Kind.ATTRIBUTE)
+
+DEFAULT_EXCLUDES = (
+    "__pycache__",
+    ".venv",
+    "venv",
+    "tests",
+    "test",
+    "conftest.py",
+    "setup.py",
+    "build",
+    "dist",
+    "*.egg-info",
+    "node_modules",
+    "alembic",
+    "migrations",
+)
 
 
 def public_members(
@@ -74,12 +92,17 @@ def api_surface_markdown(module_name: str) -> str:
     return "\n".join([f"# {module_name}", "", *_member_lines(module)])
 
 
-def _module_paths(directory: Path) -> Iterator[Path]:
+def _is_excluded(path: Path, directory: Path, patterns: Sequence[str]) -> bool:
+    return any(
+        part.startswith(".") or any(fnmatch(part, pattern) for pattern in patterns)
+        for part in path.relative_to(directory).parts
+    )
+
+
+def _module_paths(directory: Path, patterns: Sequence[str]) -> Iterator[Path]:
     for path in sorted(directory.rglob("*.py")):
-        parts = path.relative_to(directory).parts
-        if any(part.startswith(".") or part == "__pycache__" for part in parts):
-            continue
-        yield path
+        if not _is_excluded(path, directory, patterns):
+            yield path
 
 
 def _package_root(path: Path, fallback: Path) -> Path:
@@ -89,12 +112,21 @@ def _package_root(path: Path, fallback: Path) -> Path:
     return fallback
 
 
-def directory_surface_markdown(directory: str) -> str:
+def directory_surface_markdown(
+    directory: str,
+    exclude: Sequence[str] = (),
+    title: str = "",
+    heading_base: Path | None = None,
+) -> str:
     root = Path(directory).resolve()
-    lines = [f"# {root.name}", ""]
-    for path in _module_paths(root):
+    base = heading_base.resolve() if heading_base else None
+    patterns = (*DEFAULT_EXCLUDES, *exclude)
+    lines = [f"# {title or root.name}", ""]
+    for path in _module_paths(root, patterns):
         name, search_paths = resolve_target(str(path))
-        heading = path.relative_to(_package_root(path, root)).as_posix()
-        lines.extend([f"## {heading}", ""])
-        lines.extend(_member_lines(load(name, search_paths=search_paths)))
+        members = _member_lines(load(name, search_paths=search_paths))
+        if not members:
+            continue
+        heading = path.relative_to(base or _package_root(path, root)).as_posix()
+        lines.extend([f"## {heading}", "", *members])
     return "\n".join(lines)
