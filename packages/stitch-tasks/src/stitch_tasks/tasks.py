@@ -49,16 +49,18 @@ def _emit(markdown: str, output: str, stem: str) -> None:
 
 
 @tasks.script(
+    task_name="api:module",
     help="Write a module's public top-level API surface as markdown",
     task_args=False,
     options={"args": _surface_args("module", "Importable module path")},
     tags=["docs"],
 )
-def api_surface(module: str, *, output: str = "") -> None:
+def api_module(module: str, *, output: str = "") -> None:
     _emit(api_surface_markdown(module), output, module.rsplit(".", 1)[-1])
 
 
 @tasks.script(
+    task_name="api:directory",
     help="Write every module under a directory as one markdown API surface",
     task_args=False,
     options={
@@ -69,7 +71,7 @@ def api_surface(module: str, *, output: str = "") -> None:
     },
     tags=["docs"],
 )
-def api_surface_tree(
+def api_directory(
     directory: str, *, output: str = "", exclude: Sequence[str] = ()
 ) -> None:
     _emit(
@@ -80,6 +82,7 @@ def api_surface_tree(
 
 
 @tasks.script(
+    task_name="api:package",
     help="Write a package's whole API surface as one markdown file",
     task_args=False,
     options={
