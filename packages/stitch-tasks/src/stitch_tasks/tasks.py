@@ -22,7 +22,7 @@ def _surface_args(target: str, target_help: str) -> list[dict]:
             "name": "output",
             "options": ["-o", "--output"],
             "default": "",
-            "help": "Destination path, defaults to docs/<name>-api-surface.md",
+            "help": f"Destination path, defaults to docs/<name>-{target}.md",
         },
     ]
 
@@ -41,8 +41,8 @@ def _path_args() -> list[dict]:
     ]
 
 
-def _emit(markdown: str, output: str, stem: str) -> None:
-    path = Path(output) if output else Path("docs") / f"{stem}-api-surface.md"
+def _emit(markdown: str, output: str, stem: str, kind: str) -> None:
+    path = Path(output) if output else Path("docs") / f"{stem}-{kind}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(markdown, encoding="utf-8")
     print(path)
@@ -56,7 +56,7 @@ def _emit(markdown: str, output: str, stem: str) -> None:
     tags=["docs"],
 )
 def api_module(module: str, *, output: str = "") -> None:
-    _emit(api_surface_markdown(module), output, module.rsplit(".", 1)[-1])
+    _emit(api_surface_markdown(module), output, module.rsplit(".", 1)[-1], "module")
 
 
 @tasks.script(
@@ -78,6 +78,7 @@ def api_directory(
         directory_surface_markdown(directory, exclude),
         output,
         Path(directory).resolve().name,
+        "directory",
     )
 
 
@@ -101,4 +102,5 @@ def api_package(package: str, *, output: str = "", exclude: Sequence[str] = ()) 
         ),
         output,
         name,
+        "package",
     )
