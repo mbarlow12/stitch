@@ -56,7 +56,7 @@ def test_modules_without_public_members_are_omitted(surface: str) -> None:
 def test_reexports_are_omitted_from_the_module_that_imports_them(
     surface: str,
 ) -> None:
-    assert "## src/treepkg/__init__.py" in surface
+    assert "## `src/treepkg/__init__.py`" in surface
     assert "VERSION" in surface
     assert surface.count("class Widget") == 1
 
@@ -71,7 +71,7 @@ def test_heading_base_makes_headings_relative_to_it() -> None:
     surface = directory_surface_markdown(
         str(package), title="treepkg", heading_base=package
     )
-    assert surface.startswith("# treepkg\n")
-    assert "## core.py" in surface
-    assert "## sub/deep.py" in surface
+    assert surface.startswith("# `treepkg`\n")
+    assert "## `core.py`" in surface
+    assert "## `sub/deep.py`" in surface
     assert "src/treepkg" not in surface
