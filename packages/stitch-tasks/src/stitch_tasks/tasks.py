@@ -10,6 +10,7 @@ from ._internal.griffe import (
     api_surface_markdown,
     directory_surface_markdown,
 )
+from ._internal.npm import FRONTEND_PACKAGE, frontend_api_surface
 from ._internal.openai import responses_joke
 from ._internal.workspace import resolve_package, workspace_packages
 
@@ -100,7 +101,7 @@ def api_directory(
             *_surface_args(
                 "package",
                 "Installed package name or a path in one; "
-                "defaults to every workspace member",
+                "defaults to every workspace member and the frontend",
                 required=False,
             ),
             *_path_args(),
@@ -111,15 +112,17 @@ def api_directory(
 def api_package(
     package: str = "", *, output: str = "", exclude: Sequence[str] = ()
 ) -> None:
-    if package:
+    if package and package != FRONTEND_PACKAGE:
         targets = [resolve_package(package)]
     elif output:
         raise ValueError(
-            "--output needs a single package; omit it to write every "
-            "workspace member to docs/"
+            f"--output needs a single Python package; {FRONTEND_PACKAGE} and "
+            "the whole workspace write to docs/"
         )
     else:
-        targets = workspace_packages()
+        targets = [] if package else workspace_packages()
+    if package in ("", FRONTEND_PACKAGE):
+        frontend_api_surface()
     for name, directory in targets:
         _emit(
             directory_surface_markdown(
