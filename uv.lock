@@ -2513,12 +2513,14 @@ source = { editable = "packages/stitch-tasks" }
 dependencies = [
     { name = "griffelib", extra = ["faster"] },
     { name = "poethepoet-tasks" },
+    { name = "rich" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "griffelib", extras = ["faster"], specifier = ">=2.4.1" },
     { name = "poethepoet-tasks", specifier = ">=0.3.0" },
+    { name = "rich", specifier = ">=15.0.0" },
 ]
 
 [[package]]

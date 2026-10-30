@@ -10,6 +10,7 @@ from ._internal.griffe import (
     api_surface_markdown,
     directory_surface_markdown,
 )
+from ._internal.openai import responses_joke
 from ._internal.workspace import resolve_package, workspace_packages
 
 tasks = TaskCollection()
@@ -128,3 +129,12 @@ def api_package(
             name,
             "package",
         )
+
+
+@tasks.script(
+    task_name="joke",
+    help="Ask the configured Azure Responses model for a one-line joke",
+    tags=["llm"],
+)
+def joke(topic: str = "oil and gas data") -> None:
+    responses_joke(topic)

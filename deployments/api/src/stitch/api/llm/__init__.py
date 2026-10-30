@@ -1,4 +1,5 @@
 from __future__ import annotations
+from pydantic.fields import FieldInfo
 
 import asyncio
 import json
@@ -6,6 +7,7 @@ from collections.abc import Collection
 from datetime import UTC, datetime
 from functools import lru_cache
 from typing import Any, ClassVar, Literal, get_args
+from typing_extensions import TypeForm
 
 from openai import AsyncOpenAI, OpenAIError
 from pydantic import (
@@ -178,7 +180,7 @@ class SuggestedValue[T](BaseModel):
     citations: list[Citation]
 
     @classmethod
-    def model_parametrized_name(cls, params: tuple[type[Any], ...]) -> str:
+    def model_parametrized_name(cls, params: tuple[TypeForm[Any], ...]) -> str:
         return cls.__name__
 
 
@@ -198,7 +200,7 @@ async def _suggest(
     )
     try:
         response = await client.responses.parse(
-            model=get_llm_settings().azure_openai_model,
+            model=get_llm_settings().azure_openai_model or "",
             instructions=(
                 f"You infer the `{field}` value for one oil and gas field. That field "
                 f"means: {description} Search the public web for evidence and cite "
@@ -210,7 +212,7 @@ async def _suggest(
                 f"Source records behind it:\n{sources}"
             ),
             tools=[{"type": "web_search"}],
-            text_format=SuggestedValue[info.annotation],
+            text_format=SuggestedValue[FieldInfo],
             store=False,
         )
     except OpenAIError as exc:
