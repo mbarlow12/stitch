@@ -14,15 +14,16 @@ from stitch.observability import (
     resource_attributes_from_env,
     shutdown_tracing,
 )
-from .middleware import register_middlewares
-from .db.config import dispose_engine
-from .auth import validate_auth_config_at_startup
-from .settings import Settings, get_settings
 
+from .auth import validate_auth_config_at_startup
+from .db.config import dispose_engine
+from .middleware import register_middlewares
 from .routers.auth import router as auth_router
 from .routers.health import router as health_router
-from .routers.oil_gas_fields import router as ogfield_resource_router
 from .routers.oil_gas_field_sources import router as ogfield_source_router
+from .routers.oil_gas_fields import router as ogfield_resource_router
+from .settings import Settings, get_settings
+from .v2 import stitch_api_v2
 
 base_router = APIRouter(prefix="/api/v1")
 base_router.include_router(auth_router)
@@ -114,6 +115,8 @@ _tracer_provider = configure_tracing(
     environment=settings.environment_name,
 )
 app = create_app(settings, tracer_provider=_tracer_provider)
+
+app.mount("/v2", stitch_api_v2)
 
 # Instrument outbound httpx as a process-global step (kept out of ``create_app``
 # so the instrumentation tests, which build through it with a real provider,
