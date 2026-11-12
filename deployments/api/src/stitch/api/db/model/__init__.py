@@ -4,6 +4,7 @@ from .og_field_resource_source_priority import OGFieldResourceSourcePriority
 from .oil_gas_field_source import OilGasFieldSourceModel
 from .oil_gas_field_source_value import OilGasFieldSourceValueModel
 from .membership import MembershipModel, MembershipStatus
+from .resource_base import ResourceBase
 from .resource import ResourceModel
 from .merge_candidate import MergeCandidateItemModel, MergeCandidateModel
 from .user import User as UserModel
@@ -17,6 +18,7 @@ __all__ = [
     "OilGasFieldSourceValueModel",
     "MergeCandidateItemModel",
     "MergeCandidateModel",
+    "ResourceBase",
     "ResourceModel",
     "StitchBase",
     "UserModel",
