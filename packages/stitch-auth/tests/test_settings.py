@@ -1,4 +1,3 @@
-
 import pytest
 from pydantic import ValidationError
 
@@ -21,7 +20,6 @@ def _clean_auth_env(monkeypatch):
 
 
 class TestOIDCSettingsValidation:
-
     def test_missing_required_fields_raises(self):
         with pytest.raises(ValidationError):
             OIDCSettings(_env_file=None)
@@ -39,7 +37,6 @@ class TestOIDCSettingsValidation:
 
 
 class TestOIDCSettingsDefaults:
-
     def test_default_algorithms(self):
         settings = OIDCSettings(
             issuer="https://auth.example.com/",
@@ -66,7 +63,6 @@ class TestOIDCSettingsDefaults:
 
 
 class TestOIDCSettingsFromEnv:
-
     def test_from_env_vars(self, monkeypatch):
         monkeypatch.setenv("AUTH_ISSUER", "https://auth.example.com/")
         monkeypatch.setenv("AUTH_AUDIENCE", "https://api.example.com")

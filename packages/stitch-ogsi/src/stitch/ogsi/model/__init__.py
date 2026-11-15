@@ -194,7 +194,6 @@ class OGFieldDetailView(OGFieldListItemView):
 
 
 class OGFieldSourceValueView(BaseModel):
-
     source: OGSISrcKey
     source_id: int
     value: Any

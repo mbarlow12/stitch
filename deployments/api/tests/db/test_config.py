@@ -1,4 +1,3 @@
-
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,7 +7,6 @@ from stitch.api.db.config import UnitOfWork
 
 
 class TestUnitOfWork:
-
     def test_session_raises_before_enter(self):
         factory = MagicMock(spec=async_sessionmaker)
         uow = UnitOfWork(factory)

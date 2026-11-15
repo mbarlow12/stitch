@@ -1,4 +1,3 @@
-
 from contextvars import ContextVar
 from time import perf_counter
 from typing import TYPE_CHECKING
@@ -41,15 +40,13 @@ def _route_template(request: "Request") -> str:
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
-
     def on_request_start(self, request: "Request") -> object:
         return None
 
     def request_log_fields(self, state: object) -> dict:
         return {}
 
-    def on_request_finish(self, state: object) -> None:
-        ...
+    def on_request_finish(self, state: object) -> None: ...
 
     async def dispatch(self, request: "Request", call_next) -> "Response":
         request_id = uuid4().hex

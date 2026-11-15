@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +23,6 @@ _QueryParams = OGFieldQueryParams
 
 
 class TestSourceQueryAction:
-
     @pytest.fixture
     async def seeded_sources(
         self,
@@ -95,7 +93,6 @@ class TestSourceDetailAction:
 
 
 class TestCreateAndAttachSources:
-
     @staticmethod
     def _gem_source(name: str, **attrs) -> GemSource:
         return GemSource(
@@ -169,7 +166,6 @@ class TestCreateAndAttachSources:
 
 
 class TestAttachSourcesDedup:
-
     @staticmethod
     async def _membership_count(
         session: AsyncSession, resource_id: int, source_pk: int

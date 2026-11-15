@@ -1,4 +1,3 @@
-
 import logging
 
 _query_logger = logging.getLogger("stitch.api.observability.query")

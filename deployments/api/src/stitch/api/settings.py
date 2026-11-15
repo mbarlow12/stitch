@@ -87,7 +87,6 @@ class Settings(OTelSettings):
     slow_query_ms: float = 200.0
     log_all_queries: bool = False
 
-
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

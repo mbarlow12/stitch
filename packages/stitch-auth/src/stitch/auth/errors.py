@@ -1,8 +1,7 @@
 from collections.abc import Iterable
 
 
-class AuthError(Exception):
-    ...
+class AuthError(Exception): ...
 
 
 class TokenExpiredError(AuthError): ...

@@ -1,4 +1,3 @@
-
 from httpx import AsyncClient
 import pytest
 from sqlalchemy import select
@@ -9,7 +8,6 @@ from stitch.api.db.model import ResourceModel
 
 
 class TestResourcesIntegration:
-
     @pytest.mark.anyio
     async def test_get_nonexistent_returns_404(self, integration_client):
         response = await integration_client.get("/oil-gas-fields/999")
@@ -109,7 +107,6 @@ class TestResourcesIntegration:
 
 
 class TestRepointedResourceRedirect:
-
     async def _create(self, client: AsyncClient, fact, name: str) -> int:
         resp = await client.post(
             "/oil-gas-fields/", json=fact(name=name).model_dump(mode="json")

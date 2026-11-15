@@ -1,4 +1,3 @@
-
 from typing import get_args
 
 import pytest

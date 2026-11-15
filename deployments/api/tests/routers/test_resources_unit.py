@@ -1,4 +1,3 @@
-
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -13,7 +12,6 @@ from tests.factories import ResourceCreateFactory, SourceFactory
 
 
 class TestGetResourceUnit:
-
     @pytest.mark.anyio
     async def test_returns_resource_when_found(
         self,
@@ -67,7 +65,6 @@ class TestGetResourceUnit:
 
 
 class TestCreateResourceUnit:
-
     @pytest.mark.anyio
     async def test_creates_resource_with_user(
         self,
@@ -148,7 +145,6 @@ class TestCreateResourceUnit:
 
 
 class TestGetAllResourcesUnit:
-
     @pytest.mark.anyio
     async def test_returns_paginated_response(
         self,
@@ -207,7 +203,6 @@ class TestGetAllResourcesUnit:
 
 
 class TestListResourcesMultiValueFiltersUnit:
-
     @pytest.mark.anyio
     async def test_repeated_filter_param_keeps_every_value(
         self, async_client, mock_uow
@@ -246,7 +241,6 @@ class TestListResourcesMultiValueFiltersUnit:
 
 
 class TestGetResourceFilterOptionsUnit:
-
     @pytest.mark.anyio
     async def test_returns_filter_options(self, async_client, mock_uow):
         async def override_get_uow():

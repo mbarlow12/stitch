@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy import select
 
@@ -19,7 +18,6 @@ def _make_claims(
 
 
 class TestGetCurrentUserJITProvisioning:
-
     @pytest.mark.anyio
     async def test_creates_user_on_first_login(
         self,

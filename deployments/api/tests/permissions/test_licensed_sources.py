@@ -1,4 +1,3 @@
-
 from stitch.auth import TokenClaims
 
 from stitch.api.permissions import licensed_sources

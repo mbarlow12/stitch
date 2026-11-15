@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import json
@@ -22,8 +21,6 @@ def assert_has_error(errors: list[dict], *, type: str, loc: tuple) -> None:
     assert any(e["type"] == type and e["loc"] == loc for e in errors), (
         f"Expected {type} at {loc}, got: {[e['type'] + ' @ ' + str(e['loc']) for e in errors]}"
     )
-
-
 
 
 class TestSourceSubclassing:
@@ -152,8 +149,6 @@ class TestSourceSubclassing:
         bar = BarSource.model_validate(bar_orm, from_attributes=True)
         assert bar.id == uid
         assert bar.label == "test"
-
-
 
 
 class TestSourceValidation:

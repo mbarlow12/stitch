@@ -1,4 +1,3 @@
-
 import json
 import logging
 import os
@@ -18,7 +17,6 @@ _PLAIN_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 
 
 class JsonFormatter(logging.Formatter):
-
     def format(self, record: logging.LogRecord) -> str:
         payload: dict = {
             "ts": self.formatTime(record),
@@ -44,7 +42,6 @@ class JsonFormatter(logging.Formatter):
 
 
 class ResourceAttributesFilter(logging.Filter):
-
     def __init__(self, attributes: Mapping[str, str]) -> None:
         super().__init__()
         self._attributes = dict(attributes)

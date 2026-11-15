@@ -1,4 +1,3 @@
-
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,7 +49,6 @@ def _labeled_statements_use_read_model(events: list[dict]) -> bool:
 
 
 class TestEndpointQueryLabels:
-
     @pytest.mark.anyio
     async def test_list_endpoint_labels(
         self,
@@ -128,7 +126,6 @@ async def _attach_source(
 
 
 class TestActionCallSiteLabels:
-
     @pytest.mark.anyio
     async def test_resource_read_labels(
         self,

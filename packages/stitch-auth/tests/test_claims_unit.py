@@ -1,4 +1,3 @@
-
 import pytest
 
 from pydantic import ValidationError
@@ -7,7 +6,6 @@ from stitch.auth.permissions import RESOURCE_READ, SOURCE_READ_WM
 
 
 class TestTokenClaimsConstruction:
-
     def test_minimal_claims(self):
         claims = TokenClaims(sub="auth0|abc123")
 
@@ -51,7 +49,6 @@ class TestTokenClaimsConstruction:
 
 
 class TestTokenClaimsPermissions:
-
     def test_permissions_defaults_to_empty_frozenset(self):
         claims = TokenClaims(sub="auth0|abc")
 

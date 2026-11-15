@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -16,7 +15,6 @@ from stitch.models import (
     SourceRecord,
     SourcePayload,
 )
-
 
 
 class FooSource(Source[int, Literal["foo"]]):
@@ -38,8 +36,6 @@ class UuidSource(Source[UUID, Literal["uuid_src"]]):
     source: Literal["uuid_src"] = "uuid_src"
 
 
-
-
 class FooPayload(SourcePayload):
     foos: Mapping[int, FooSource] = Field(default_factory=dict)
 
@@ -51,8 +47,6 @@ class MultiPayload(SourcePayload):
 
 class UuidPayload(SourcePayload):
     uuids: Mapping[UUID, UuidSource] = Field(default_factory=dict)
-
-
 
 
 class EmptyPayload(SourcePayload):
@@ -82,8 +76,6 @@ class ResourceWithSrcUnion(Resource[int, TestSrcUnion]):
     res_c: str
 
 
-
-
 class FooSourceORM:
     def __init__(
         self, id: int, source: str, value: float, source_record: dict | None = None
@@ -102,8 +94,6 @@ class BarSourceORM:
         self.source = source
         self.label = label
         self.source_record = source_record
-
-
 
 
 @pytest.fixture

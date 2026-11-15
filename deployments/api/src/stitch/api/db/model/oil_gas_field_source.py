@@ -16,7 +16,6 @@ from .oil_gas_field_source_value import ATTRIBUTE_NAMES, OilGasFieldSourceValueM
 
 
 class OilGasFieldSourceModel(TimestampMixin, UserAuditMixin, Base):
-
     type_adapter: ClassVar[TypeAdapter[OGFieldSource]] = TypeAdapter(OGFieldSource)
 
     __tablename__: str = "oil_gas_field_sources"

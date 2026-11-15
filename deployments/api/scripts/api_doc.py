@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 
 import re
@@ -166,8 +164,7 @@ def get_openapi_endpoints() -> set[str]:
 
 
 @click.group()
-def cli():
-    ...
+def cli(): ...
 
 
 @cli.command()

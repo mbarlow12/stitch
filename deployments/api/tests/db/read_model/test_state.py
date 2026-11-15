@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from typing import Any
@@ -356,7 +355,6 @@ class TestFullRebuild:
 
 
 class TestValuesTodaysModelRejects:
-
     async def test_full_rebuild_completes(
         self,
         seeded_integration_session: AsyncSession,

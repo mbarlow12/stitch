@@ -1,4 +1,3 @@
-
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -10,7 +9,6 @@ from tests.utils import make_source_record
 
 
 class TestQuerySourcesUnit:
-
     @pytest.mark.anyio
     async def test_returns_paginated_response(self, async_client, mock_uow):
         async def override_get_uow():

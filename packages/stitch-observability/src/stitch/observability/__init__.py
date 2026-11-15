@@ -1,4 +1,3 @@
-
 from .logging_config import (
     JsonFormatter,
     ResourceAttributesFilter,

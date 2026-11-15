@@ -1,4 +1,3 @@
-
 from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from typing import Any
@@ -20,7 +19,6 @@ Cases = dict[str, list[Any]]
 
 @dataclass(frozen=True)
 class Rec:
-
     rid: int
     name: str | None
     country: str | None
@@ -30,7 +28,6 @@ class Rec:
 
 @dataclass(frozen=True)
 class State:
-
     records: tuple[Rec, ...] = ()
     repointed: Mapping[int, int] = field(default_factory=dict)
     candidates: Candidates = ()

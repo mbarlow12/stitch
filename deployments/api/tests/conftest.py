@@ -1,4 +1,3 @@
-
 from collections.abc import AsyncIterator
 from functools import partial
 from unittest.mock import AsyncMock, MagicMock

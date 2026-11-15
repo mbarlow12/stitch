@@ -1,4 +1,3 @@
-
 import pytest
 from httpx import AsyncClient
 
@@ -6,7 +5,6 @@ from stitch.api.entities import OGFieldQueryParams, OGSI_SOURCE_DEFAULT
 
 
 class TestOGFieldQueryParams:
-
     def test_source_defaults_to_all_ogsi_sources(self):
         params = OGFieldQueryParams()
 
@@ -19,7 +17,6 @@ class TestOGFieldQueryParams:
 
 
 class TestResourceRouterParamValidation:
-
     @pytest.mark.anyio
     async def test_invalid_field_status_returns_422(self, async_client: AsyncClient):
         resp = await async_client.get(
@@ -72,7 +69,6 @@ class TestResourceRouterParamValidation:
 
 
 class TestSourceRouterParamValidation:
-
     @pytest.mark.anyio
     async def test_invalid_field_status_returns_422(self, async_client: AsyncClient):
         resp = await async_client.get(

@@ -1,4 +1,3 @@
-
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,6 @@ from stitch.api.settings import OriginUrl, PostgresConfig, Settings, SqliteConfi
 
 
 class TestPostgresConfig:
-
     def test_to_url_format(self):
         config = PostgresConfig(
             host="localhost",
@@ -66,7 +64,6 @@ class TestPostgresConfig:
 
 
 class TestSqliteConfig:
-
     def test_to_url_memory(self):
         config = SqliteConfig(db_path=None)
 
@@ -95,7 +92,6 @@ class TestSqliteConfig:
 
 
 class TestOriginUrlValidation:
-
     def test_valid_origin_url(self):
         adapter = TypeAdapter(OriginUrl)
 
@@ -134,7 +130,6 @@ class TestOriginUrlValidation:
 
 
 class TestSettings:
-
     def test_get_database_url_postgres_dialect(self, monkeypatch):
         monkeypatch.setenv("POSTGRES_HOST", "pghost")
         monkeypatch.setenv("POSTGRES_DB", "pgdb")

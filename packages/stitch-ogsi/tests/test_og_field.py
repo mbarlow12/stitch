@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -22,12 +21,10 @@ from stitch.ogsi.model import OilGasOperator, OilGasOwner
 from stitch.ogsi.model.og_field import OilGasFieldBase
 
 
-
 _source_adapter = TypeAdapter(OGFieldSource)
 
 
 class TestOGFieldSourceDiscriminator:
-
     def test_gem_source_from_json(self):
         obj = _source_adapter.validate_json(
             '{"source": "gem", "name": "Test Field", "country": "USA", "source_record": {"observed_at": "2026-01-01T00:00:00Z", "producer": "test", "payload": {"kind": "fixture"}}}'
@@ -102,10 +99,7 @@ class TestOGFieldSourceDiscriminator:
         )
 
 
-
-
 class TestOwnershipStake:
-
     @pytest.mark.parametrize("model", [OilGasOwner, OilGasOperator])
     def test_stake_defaults_to_none_when_omitted(self, model):
         party = model(name="Acme Energy")
@@ -146,10 +140,7 @@ class TestOwnershipStake:
         assert OilGasFieldBase.model_validate(dumped) == field
 
 
-
-
 class TestOGFieldResource:
-
     def test_has_both_base_class_fields(self, og_payload: Sequence[OGFieldSource]):
         resource = OGFieldResource(
             id=1,

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from collections.abc import Collection
@@ -220,7 +219,6 @@ class TestWritesKeepStateInSync:
 
 
 class TestInPlaceSourceValueEdit:
-
     async def test_must_refresh_every_resource_linked_to_the_source(
         self, seeded_integration_session: AsyncSession, rebuilt: Dataset
     ):
@@ -258,7 +256,6 @@ class TestInPlaceSourceValueEdit:
 
 
 class TestLockBeforeRecompute:
-
     @pytest.fixture
     def events(
         self, integration_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch

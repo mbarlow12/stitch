@@ -1,4 +1,3 @@
-
 import time
 
 import jwt as pyjwt
@@ -10,7 +9,6 @@ from stitch.auth.validator import JWTValidator
 
 
 class TestJWTValidatorHappyPath:
-
     def test_validates_token_returns_claims(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
@@ -112,7 +110,6 @@ class TestJWTValidatorHappyPath:
 
 
 class TestJWTValidatorErrors:
-
     def test_expired_token_raises_token_expired_error(
         self, oidc_settings, mock_jwks_client, token_factory
     ):
@@ -200,7 +197,6 @@ class TestJWTValidatorErrors:
 
 
 class TestJWTValidatorPermissions:
-
     def test_extracts_permissions_when_present(
         self, oidc_settings, mock_jwks_client, token_factory
     ):

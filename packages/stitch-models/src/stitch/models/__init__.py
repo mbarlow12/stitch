@@ -28,7 +28,6 @@ class SourceRecord(BaseModel):
 
 
 class Source[TId: IdType, TSrcKey: str](BaseModel):
-
     id: TId | None = None
     source: TSrcKey
     source_record: SourceRecord
@@ -43,7 +42,6 @@ class SourceView[TId: IdType, TSrcKey: str](Source[TId, TSrcKey]):
 
 
 class SourcePayload(BaseModel):
-
     model_config: ClassVar[ConfigDict] = ConfigDict(from_attributes=True)
 
 

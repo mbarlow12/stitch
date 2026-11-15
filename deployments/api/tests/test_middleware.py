@@ -1,4 +1,3 @@
-
 from collections.abc import AsyncIterator
 
 import pytest
@@ -19,7 +18,6 @@ async def cors_client() -> AsyncIterator[AsyncClient]:
 
 
 class TestCorsMiddleware:
-
     @pytest.fixture
     def allowed_origin(self) -> str:
         settings = get_settings()

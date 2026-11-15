@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,7 +120,6 @@ async def _execute(session: AsyncSession, *, licensed_sources=None, **overrides)
 
 
 class TestBaseQuerySubstringSearch:
-
     @pytest.mark.anyio
     async def test_q_matches_name_and_name_local(
         self,
@@ -153,7 +151,6 @@ class TestBaseQuerySubstringSearch:
 
 
 class TestBaseQueryExactFilters:
-
     @pytest.mark.anyio
     async def test_multiple_filters_and(
         self,
@@ -211,7 +208,6 @@ class TestBaseQueryExactFilters:
 
 
 class TestBaseQuerySortAndPagination:
-
     @pytest.mark.anyio
     async def test_sort_and_paginate(
         self,
@@ -256,7 +252,6 @@ class TestBaseQuerySortAndPagination:
 
 
 class TestSourceFilter:
-
     @pytest.mark.anyio
     async def test_single_source(self, seeded_integration_session, seeded_sources):
         rows, total = await _execute(seeded_integration_session, source=["gem"])
@@ -273,7 +268,6 @@ class TestSourceFilter:
 
 
 class TestLicensedSourcesGating:
-
     @pytest.mark.anyio
     async def test_licensing_hides_unlicensed_rows(
         self, seeded_integration_session, seeded_sources
@@ -289,7 +283,6 @@ class TestLicensedSourcesGating:
 
 
 class TestNarrowingProofs:
-
     @pytest.mark.anyio
     async def test_filter_by_basin(self, seeded_integration_session, seeded_sources):
         rows, total = await _execute(seeded_integration_session, basin=["Permian"])
@@ -359,7 +352,6 @@ async def tiebreak_sources(
 
 
 class TestDeterministicTiebreak:
-
     @pytest.mark.anyio
     async def test_duplicate_and_null_sort_values(
         self, seeded_integration_session, tiebreak_sources
@@ -384,7 +376,6 @@ class TestDeterministicTiebreak:
 
 
 class TestSortBySource:
-
     @pytest.mark.anyio
     async def test_sort_by_source_orders_by_source(
         self, seeded_integration_session, seeded_sources

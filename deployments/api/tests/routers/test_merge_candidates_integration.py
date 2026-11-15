@@ -1,4 +1,3 @@
-
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from unittest.mock import patch
@@ -797,7 +796,6 @@ class TestMergeCandidateListIntegration:
 
 
 class TestMergeCandidateSearchIntegration:
-
     @pytest.fixture
     def make_resource(
         self, integration_client, og_field_resource_factory, source_maker

@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import json
@@ -27,8 +26,6 @@ def assert_has_error(errors: list[dict], *, type: str, loc: tuple) -> None:
     assert any(e["type"] == type and e["loc"] == loc for e in errors), (
         f"Expected {type} at {loc}, got: {[e['type'] + ' @ ' + str(e['loc']) for e in errors]}"
     )
-
-
 
 
 class TestSourcePayloadSubclassing:
@@ -62,8 +59,6 @@ class TestSourcePayloadSubclassing:
         )
         payload = UuidPayload(uuids={uid: src})
         assert payload.uuids[uid].id == uid
-
-
 
 
 class TestResourceSubclassing:
@@ -130,8 +125,6 @@ class TestResourceSubclassingDiscriminatedUnion:
         errs = exc_info.value.errors()
         assert len(errs) == 1
         assert errs[0]["loc"] == ("source_data", 0, "bar", "label")
-
-
 
 
 class TestResourceValidation:

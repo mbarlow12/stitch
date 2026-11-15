@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy import JSON, Float, Integer, String, text
 from sqlalchemy.exc import IntegrityError

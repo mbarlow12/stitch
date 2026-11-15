@@ -250,8 +250,6 @@ async def test_wait_for_health_raises_after_retries_are_exhausted() -> None:
     await raw_client.aclose()
 
 
-
-
 @pytest.mark.anyio
 async def test_retry_statuses_retries_then_succeeds() -> None:
     calls: list[int] = []

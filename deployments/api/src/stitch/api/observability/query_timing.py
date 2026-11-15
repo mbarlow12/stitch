@@ -1,4 +1,3 @@
-
 import re
 
 from sqlalchemy import event

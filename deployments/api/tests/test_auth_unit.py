@@ -1,4 +1,3 @@
-
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -38,7 +37,6 @@ def _make_oidc_settings(
 
 
 class TestValidateAuthConfigAtStartup:
-
     def test_allows_disabled_in_dev(self):
         settings = _make_settings(auth_disabled=True, environment="development")
         with patch("stitch.api.auth.get_settings", return_value=settings):
@@ -88,7 +86,6 @@ class TestValidateAuthConfigAtStartup:
 
 
 class TestGetTokenClaims:
-
     def test_returns_dev_claims_when_disabled(self):
         settings = _make_settings(auth_disabled=True, environment="development")
         oidc_settings = _make_oidc_settings()
@@ -137,7 +134,6 @@ class TestGetTokenClaims:
 
 
 class TestRequirePermissions:
-
     @pytest.mark.anyio
     async def test_default_check_requires_all_permissions(self):
         dependency = require_permissions(RESOURCE_READ, RESOURCE_WRITE)
@@ -200,7 +196,6 @@ class TestRequirePermissions:
 
 
 class TestAuthMeEndpoint:
-
     def test_returns_existing_user_and_claims(self):
         settings = _make_settings(auth_disabled=False)
         oidc_settings = _make_oidc_settings()

@@ -1,4 +1,3 @@
-
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import event, func, select
@@ -122,7 +121,6 @@ async def _override(
 
 
 class TestCreateResourceActionIntegration:
-
     @pytest.mark.anyio
     async def test_creates_resource_with_minimal_payload(
         self,
@@ -168,7 +166,6 @@ class TestCreateResourceActionIntegration:
 
 
 class TestGetResourceActionIntegration:
-
     @pytest.mark.anyio
     async def test_get_returns_resource(
         self,
@@ -206,7 +203,6 @@ class TestGetResourceActionIntegration:
 
 
 class TestGetResolvedResourceAction:
-
     @pytest.mark.anyio
     async def test_resolves_multi_hop_chain_to_root(
         self,
@@ -299,7 +295,6 @@ class TestGetResolvedResourceAction:
 
 
 class TestResourceQueryAction:
-
     @pytest.fixture
     async def seeded_resources(
         self,
@@ -690,7 +685,6 @@ class TestResourceQueryAction:
 
 
 class TestResourceUniverseAndNarrowing:
-
     @pytest.mark.anyio
     async def test_source_param_ignored_across_multiple_keys(
         self,
@@ -938,7 +932,6 @@ class TestResourceUniverseAndNarrowing:
 
 
 class TestResourceFilterOptionsAction:
-
     @pytest.mark.anyio
     async def test_returns_distinct_sorted_coalesced_values(
         self,
@@ -1284,7 +1277,6 @@ class TestResourceFilterOptionsAction:
 
 
 class TestResourceFilterOptionsCascade:
-
     async def _seed_two_countries(
         self,
         session: AsyncSession,
@@ -1491,7 +1483,6 @@ class TestResourceFilterOptionsCascade:
 
 
 class TestResourcePriorityOverride:
-
     async def _seed(self, session, user) -> int:
         return await _create_resource_with_sources(
             session,
@@ -1543,7 +1534,6 @@ class TestResourcePriorityOverride:
 
 
 class TestFieldSourceValues:
-
     async def _seed(self, session, user) -> int:
         return await _create_resource_with_sources(
             session,
@@ -1670,7 +1660,6 @@ class TestFieldSourceValues:
 
 
 class TestSetFieldSourcePriority:
-
     async def _seed(self, session, user) -> int:
         return await _create_resource_with_sources(
             session,
@@ -1844,7 +1833,6 @@ class TestSetFieldSourcePriority:
 
 
 class TestResourceDetailCoalescing:
-
     @pytest.mark.anyio
     async def test_duplicate_same_source_records_lowest_source_pk_wins(
         self,
@@ -2018,7 +2006,6 @@ class TestResourceDetailCoalescing:
 
 
 class TestBatchedSourceData:
-
     @pytest.mark.anyio
     async def test_groups_by_resource_and_filters_licensed(
         self,
@@ -2054,7 +2041,6 @@ class TestBatchedSourceData:
 
 
 class TestCoalescingEngineParity:
-
     @pytest.mark.anyio
     async def test_list_and_detail_agree_on_coalesced_winner(
         self,
@@ -2105,7 +2091,6 @@ class TestCoalescingEngineParity:
 
 
 class TestMembershipUniqueness:
-
     @staticmethod
     async def _resources_sharing_one_source(
         session: AsyncSession, user: User

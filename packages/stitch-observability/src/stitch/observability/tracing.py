@@ -1,4 +1,3 @@
-
 import logging
 from typing import TYPE_CHECKING, Literal, get_args
 
@@ -57,7 +56,6 @@ def _truncate_attributes(attributes: dict) -> dict:
 
 
 class LoggingSpanExporter(SpanExporter):
-
     def __init__(self) -> None:
         self._resource_cache: dict[int, dict] = {}
 
