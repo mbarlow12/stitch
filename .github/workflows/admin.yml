@@ -10,7 +10,7 @@ on:
       - main
       - production
   schedule:
-    - cron: "0 3 * * *" # Nightly at 3 AM UTC
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 name: Admin Checks
@@ -35,8 +35,6 @@ jobs:
     name: "Check PR size"
     uses: ./.github/workflows/admin-pr-size.yml
     with:
-      # Release promotions (next -> production ) and backmerges
-      # (production -> main) aggregate already-reviewed work.
       exempt_head_branches: |
         main
         next

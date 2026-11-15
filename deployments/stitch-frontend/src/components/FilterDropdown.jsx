@@ -1,10 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 
-// Lowercases and strips accents, so "cote" matches "Côte d'Ivoire". NFD splits
-// accented letters into a base letter plus combining marks (\p{M}), which are
-// then dropped. Letters with no decomposition, like "ø", are left as they are.
-// Curly apostrophes (as in Intl.DisplayNames' "Côte d’Ivoire") become straight
-// ones, so what a keyboard types still matches.
 function normalizeForSearch(text) {
   return String(text)
     .normalize("NFD")
@@ -13,8 +8,6 @@ function normalizeForSearch(text) {
     .toLowerCase();
 }
 
-// The open dropdown's contents. It mounts when the dropdown opens and unmounts
-// when it closes, so the search text always starts empty.
 function FilterDropdownPanel({
   label,
   options,
@@ -53,8 +46,6 @@ function FilterDropdownPanel({
                 }}
                 placeholder={`Search ${label}`}
                 aria-label={`Search ${label}`}
-                // Opening the dropdown is the intent to pick; let typing
-                // start immediately.
                 autoFocus
                 className="min-h-9 w-full rounded-md border border-line bg-panel px-3 py-1.5 text-sm text-ink transition-colors hover:border-line-strong focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
@@ -119,8 +110,6 @@ export default function FilterDropdown({
     );
   }
 
-  // Escape from the search box closes the dropdown and puts focus back on its
-  // button, so keyboard users are not left on an element that just vanished.
   function closeFromSearch() {
     setOpen(false);
     buttonRef.current?.focus();

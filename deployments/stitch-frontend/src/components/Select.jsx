@@ -1,9 +1,3 @@
-// A native <select> styled like FilterDropdown's button -- same height,
-// weight, border, hover and ▼ glyph -- so a filter and a plain choice sitting
-// side by side read as the same kind of control. The browser's own arrow is
-// hidden (appearance-none) in favour of the glyph. The right padding leaves the
-// same 6px between text and glyph as the button, and keeps the select narrow
-// enough to sit beside the Status filter in the Merge Review queue.
 export default function Select({ className = "", children, ...props }) {
   return (
     <div className={`relative ${className}`}>

@@ -9,15 +9,10 @@ import { LogoutButton } from "./components/LogoutButton";
 import { usePermissions } from "./hooks/usePermissions";
 import { SOURCES } from "./constants/sourceMeta";
 
-// ETL runs produce or refresh source data, so the page is useful to anyone who
-// can read or write at least one source. Derived from SOURCES so adding a new
-// source there automatically extends the gate.
 const SOURCE_READ_PERMISSIONS = SOURCES.map(
   (source) => `source:read:${source}`,
 );
 
-// `requires` is a has-any list: an item is visible if the caller holds any of
-// the listed permissions. Items without `requires` are ungated.
 const NAV_ITEMS = [
   { to: "/", label: "Resources", end: true },
   {
@@ -49,9 +44,6 @@ function getNavLinkClassName({ isActive }) {
 }
 
 function App() {
-  // Cached /auth/me permissions gate the nav items below. While loading we hide
-  // gated items rather than flashing them in once claims resolve, matching the
-  // pattern used on ResourceDetailPage.
   const { data: permissions, isLoading: permissionsLoading } = usePermissions();
   const granted = Array.isArray(permissions) ? permissions : [];
   const visibleNavItems = NAV_ITEMS.filter((item) => {

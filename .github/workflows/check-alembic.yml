@@ -70,9 +70,6 @@ jobs:
         if: ${{ inputs.postgres-host == '' }}
         run: docker compose -f docker-compose.yml up -d --wait db
 
-      # Only needed for the throwaway path — the live DB is already at head.
-      # POSTGRES_PASSWORD must be remapped from STITCH_MIGRATOR_PASSWORD since .env
-      # sets POSTGRES_PASSWORD to the stitch_app credential, not the migrator's.
       - name: Apply migrations (upgrade head)
         if: ${{ inputs.postgres-host == '' }}
         env:
@@ -100,10 +97,6 @@ jobs:
           SECRET_APP_PASSWORD: ${{ secrets.stitch-app-password }}
         run: |
           set -euo pipefail
-          # Grep rather than sourcing .env wholesale — sourcing would overwrite the GH env
-          # vars above (e.g. POSTGRES_HOST=db would clobber the 127.0.0.1 we set).
-          # Use assignment form (-e KEY=VALUE) so the resolved password reaches the container
-          # rather than relying on the shell variable being exported.
           _env_app_password=$(grep '^STITCH_APP_PASSWORD=' .env | cut -d= -f2-)
           docker run --rm --network host \
             -e POSTGRES_HOST \

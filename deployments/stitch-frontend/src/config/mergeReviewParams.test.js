@@ -30,7 +30,6 @@ describe("parseMergeReviewParams", () => {
       page: 3,
       pageSize: 50,
       q: "ghawar",
-      // Canonical order, whatever order the URL used.
       statuses: ["APPROVED", "DENIED"],
       sortKey: "earliest-reviewed",
     });
@@ -56,7 +55,6 @@ describe("parseMergeReviewParams", () => {
       DEFAULT_STATE,
     );
     expect(parse("page=abc").page).toBe(1);
-    // A lone sort_order has no meaning without its sort_by.
     expect(parse("sort_order=asc").sortKey).toBe("newest");
   });
 });

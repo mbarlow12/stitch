@@ -1,31 +1,4 @@
 #!/usr/bin/env python3
-"""Analyze Stitch observability logs to find slow / frequent queries.
-
-Reads the structured JSON events emitted by the Stitch observability loggers —
-request summaries on ``stitch.observability.request`` and slow-query events on
-``stitch.api.observability.query`` (one JSON object per line) — and prints two
-reports:
-
-  * QUERIES  - grouped by SQL statement: how often each runs and how much total
-               time it costs. The query at the top of the "total time" ranking
-               is the one to optimize first (slow x frequent).
-  * ROUTES   - grouped by endpoint: request latency plus how many DB queries
-               each request fires (a high average is an N+1 smell).
-
-Input is tolerant: it accepts a clean ``.jsonl`` file, raw ``docker compose
-logs`` output (the ``api-1 | `` prefix is stripped), or stdin. Non-JSON lines
-are ignored, so you can point it straight at mixed log output.
-
-Tag traffic with an ``X-Stitch-Perf-Scenario: <label>`` request header to compare
-variants (data volume, query params, ...) with ``--group-by scenario``.
-
-Examples:
-    python3 tools/analyze_logs.py /tmp/stitch-events.jsonl
-    docker compose logs --no-log-prefix api | python3 tools/analyze_logs.py -
-    python3 tools/analyze_logs.py dump.jsonl --top 25 --sort count
-    python3 tools/analyze_logs.py dump.jsonl --group-by scenario --baseline vol=1k
-"""
-
 from __future__ import annotations
 
 import argparse
@@ -35,16 +8,10 @@ import re
 import sys
 from dataclasses import dataclass, field
 
-# Strips a leading docker-compose service prefix like "api-1  | " or "api | ".
 _DOCKER_PREFIX = re.compile(r"^[a-zA-Z0-9._-]+\s*\|\s*")
 
 
 def _percentile(values: list[float], pct: float) -> float:
-    """Nearest-rank percentile (pct in 0..100). values need not be sorted.
-
-    Uses the textbook nearest-rank method: the smallest value at or below which
-    at least ``pct`` percent of the data falls (rank = ceil(pct/100 * n)).
-    """
     if not values:
         return 0.0
     ordered = sorted(values)
@@ -72,7 +39,6 @@ def parse_events(lines) -> list[dict]:
 class Stat:
     key: str
     durations: list[float] = field(default_factory=list)
-    # route-only extras
     db_counts: list[int] = field(default_factory=list)
     db_times: list[float] = field(default_factory=list)
     statuses: list[int] = field(default_factory=list)
@@ -137,7 +103,6 @@ def report_queries(events: list[dict], top: int, sort_key: str, width: int) -> N
         "max": lambda s: s.maximum,
         "mean": lambda s: s.mean,
     }
-    # 'queries' (avg DB queries/request) is routes-only; fall back to total.
     effective = sort_key if sort_key in sorters else "total"
     ranked = sorted(stats.values(), key=sorters[effective], reverse=True)
     peak_total = ranked[0].total
@@ -211,7 +176,6 @@ def _scenario_of(event: dict) -> str:
 def _grouped_stats(
     events: list[dict], suffix: str, key_field: str
 ) -> dict[str, dict[str, Stat]]:
-    """Bucket events as {primary_key: {scenario: Stat}}."""
     grouped: dict[str, dict[str, Stat]] = {}
     for e in events:
         if not e.get("logger", "").endswith(suffix):
@@ -227,7 +191,6 @@ def _grouped_stats(
 
 
 def _error_rate(stat: Stat) -> float:
-    """Percentage of requests that failed (status >= 400, incl. 401/403)."""
     failures = sum(1 for c in stat.statuses if c >= 400)
     return 100.0 * failures / stat.count if stat.count else 0.0
 
@@ -235,7 +198,6 @@ def _error_rate(stat: Stat) -> float:
 def _baseline_scenario(by_scenario: dict[str, Stat], baseline: str | None) -> str:
     if baseline and baseline in by_scenario:
         return baseline
-    # Default: the fastest variant, so deltas read as "N× slower than best".
     return min(by_scenario.values(), key=lambda s: s.mean).key
 
 

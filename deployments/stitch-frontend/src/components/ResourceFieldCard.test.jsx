@@ -15,8 +15,6 @@ import {
 import { SOURCE_LABELS } from "../constants/sourceMeta";
 import { renderWithQueryClient } from "../test/utils";
 
-// Mock only the read hook; the save path exercises the real
-// useCreateSourceForResource mutation against a spied API module.
 vi.mock("../hooks/useResources", async (importOriginal) => ({
   ...(await importOriginal()),
   useFieldSourceValues: vi.fn(),
@@ -47,7 +45,6 @@ const TWO_SOURCES = [
   },
 ];
 
-// Grant both writes required to create + attach a source.
 function grantWritePermissions() {
   vi.mocked(useHasPermission).mockImplementation((permission) =>
     ["source:write", "resource:write"].includes(permission),
@@ -72,9 +69,6 @@ async function openPanel(user) {
   await user.click(screen.getByRole("button", { name: /Foo Basin/i }));
 }
 
-// Renders the card plus a button that forces a parent re-render -- standing in for
-// a background refetch -- without unmounting the open panel, so its edit state
-// survives while `useFieldSourceValues` reports new data.
 function RefetchHarness() {
   const [, setTick] = useState(0);
   return (
@@ -100,7 +94,6 @@ describe("ResourceFieldCard", () => {
       isLoading: false,
       isError: false,
     });
-    // Default: no permissions, so the edit affordance stays hidden.
     useHasPermission.mockReturnValue(false);
     useHasAllPermissions.mockReturnValue(false);
     updateFieldSourcePriority.mockResolvedValue([]);
@@ -113,7 +106,6 @@ describe("ResourceFieldCard", () => {
 
   it("does not enable the query until the panel is opened", () => {
     renderCard();
-    // Closed on first render → query disabled.
     expect(useFieldSourceValues).toHaveBeenLastCalledWith(
       "oil-gas-fields",
       42,
@@ -206,7 +198,6 @@ describe("ResourceFieldCard", () => {
 
   it("offers add but not reorder controls when only one source has a value", async () => {
     const user = userEvent.setup();
-    // Both writes → the field can still be edited to add a value...
     grantWritePermissions();
     useFieldSourceValues.mockReturnValue({
       data: [TWO_SOURCES[0]],
@@ -218,11 +209,9 @@ describe("ResourceFieldCard", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
-    // ...the add affordance is present...
     expect(
       screen.getByRole("button", { name: /add value/i }),
     ).toBeInTheDocument();
-    // ...but a lone source cannot be reordered: no move arrows, no reorder Save.
     expect(
       screen.queryByRole("button", { name: `Move ${SOURCE_LABELS.wm} up` }),
     ).not.toBeInTheDocument();
@@ -233,8 +222,6 @@ describe("ResourceFieldCard", () => {
 
   it("does not offer reorder controls without read access to all sources", async () => {
     const user = userEvent.setup();
-    // Curator writes but is missing at least one source:read, so reordering (which
-    // rewrites every source's ranking) is withheld even with two sources.
     grantWritePermissions();
     useHasAllPermissions.mockReturnValue(false);
     useFieldSourceValues.mockReturnValue({
@@ -247,11 +234,9 @@ describe("ResourceFieldCard", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
-    // Add is still available (it needs only source:write + resource:write)...
     expect(
       screen.getByRole("button", { name: /add value/i }),
     ).toBeInTheDocument();
-    // ...but the reorder affordances are withheld.
     expect(
       screen.queryByRole("button", { name: `Move ${SOURCE_LABELS.gem} up` }),
     ).not.toBeInTheDocument();
@@ -274,10 +259,8 @@ describe("ResourceFieldCard", () => {
 
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
-    // Save is disabled until the order actually changes.
     expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
 
-    // Promote the second source (gem) above the winner.
     await user.click(
       screen.getByRole("button", { name: `Move ${SOURCE_LABELS.gem} up` }),
     );
@@ -288,7 +271,6 @@ describe("ResourceFieldCard", () => {
 
     expect(updateFieldSourcePriority).toHaveBeenCalledTimes(1);
     const call = updateFieldSourcePriority.mock.calls[0];
-    // (config, id, field, orderedSourcePks, fetcher, endpoint)
     expect(call[1]).toBe(42);
     expect(call[2]).toBe("basin");
     expect(call[3]).toEqual([10, 20]);
@@ -310,8 +292,6 @@ describe("ResourceFieldCard", () => {
     await user.click(screen.getByRole("button", { name: /Foo Basin/i }));
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
-    // A source is added under the open panel, so the working order no longer
-    // matches the source set a save would target.
     useFieldSourceValues.mockReturnValue({
       data: [
         ...TWO_SOURCES,
@@ -346,9 +326,6 @@ describe("ResourceFieldCard", () => {
     await user.click(screen.getByRole("button", { name: /Foo Basin/i }));
     await user.click(screen.getByRole("button", { name: "Edit" }));
 
-    // Someone else reorders the *same* sources while the panel is open and the
-    // curator has not touched anything. Save must not spuriously enable (which
-    // would overwrite the newer order with a stale snapshot); the notice shows.
     useFieldSourceValues.mockReturnValue({
       data: [TWO_SOURCES[1], TWO_SOURCES[0]],
       isLoading: false,
@@ -409,7 +386,6 @@ describe("ResourceFieldCard", () => {
 
     it("hides the Edit action without both write permissions", async () => {
       const user = userEvent.setup();
-      // Only source:write, missing resource:write.
       vi.mocked(useHasPermission).mockImplementation(
         (permission) => permission === "source:write",
       );
@@ -425,10 +401,8 @@ describe("ResourceFieldCard", () => {
       const user = userEvent.setup();
       grantWritePermissions();
       renderCard();
-      await user.click(screen.getByRole("button")); // open panel
-
+      await user.click(screen.getByRole("button"));
       await user.click(screen.getByRole("button", { name: /^edit$/i }));
-      // Only the "+" affordance shows; the fields stay hidden until it's clicked.
       expect(
         screen.getByRole("button", { name: /add value/i }),
       ).toBeInTheDocument();
@@ -456,7 +430,7 @@ describe("ResourceFieldCard", () => {
       const { queryClient } = renderCard();
       const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
 
-      await user.click(screen.getByRole("button")); // open panel
+      await user.click(screen.getByRole("button"));
       await user.click(screen.getByRole("button", { name: /^edit$/i }));
       await user.click(screen.getByRole("button", { name: /add value/i }));
       await user.type(screen.getByLabelText("New value"), "Deep Basin");
@@ -490,13 +464,10 @@ describe("ResourceFieldCard", () => {
         "oil-gas-fields",
       );
 
-      // A save can change the coalesced winning value anywhere it appears
-      // (list rows, detail, filter options), so the whole endpoint refreshes.
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["oil-gas-fields"],
       });
 
-      // Form closes on success.
       expect(
         await screen.findByRole("button", { name: /^edit$/i }),
       ).toBeInTheDocument();
@@ -540,7 +511,6 @@ describe("ResourceFieldCard", () => {
       await user.click(screen.getByRole("button", { name: /^save$/i }));
 
       expect(await screen.findByText("overwrite failed")).toBeInTheDocument();
-      // Draft is preserved so the user can retry.
       expect(screen.getByLabelText("New value")).toHaveValue("Deep Basin");
     });
 
@@ -576,9 +546,6 @@ describe("ResourceFieldCard", () => {
     });
 
     describe("fields with a fixed set of values", () => {
-      // Written out rather than imported from fieldMeta, so this also checks
-      // the frontend lists against the backend's Literal types in
-      // packages/stitch-ogsi/src/stitch/ogsi/model/types.py.
       const FIXED_VALUE_FIELDS = {
         production_conventionality: [
           "Conventional",
@@ -613,7 +580,6 @@ describe("ResourceFieldCard", () => {
         return user;
       }
 
-      // The choosable options, excluding the "Select a value" placeholder.
       function choosableOptions(select) {
         return within(select)
           .getAllByRole("option")

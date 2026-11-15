@@ -77,8 +77,6 @@ function buildLLMSourcePayload({ resourceId, result, persistIntentId }) {
     persistIntentId,
   });
 
-  // A bare source (no `id`) to be created and attached to the target resource.
-  // `name`/`country` are required keys on the field model (null when unknown).
   return {
     source: "llm",
     name: null,
@@ -241,43 +239,28 @@ function AISuggestionPanel({ endpoint, resourceId }) {
   const fetcher = createAuthenticatedFetcher(config, getAccessTokenSilently);
   const createSource = useCreateSourceForResource(endpoint);
   const [selectedField, setSelectedField] = useState(AI_SUGGESTION_FIELDS[0]);
-  // Per-field state so the single-field and bulk "Enrich this resource" flows
-  // share the same rendering pipeline. `fieldOrder` preserves display order
-  // (single-field replaces it; bulk uses AI_SUGGESTION_FIELDS order).
   const [fieldOrder, setFieldOrder] = useState([]);
   const [resultsByField, setResultsByField] = useState({});
   const [errorsByField, setErrorsByField] = useState({});
   const [generatingFields, setGeneratingFields] = useState(() => new Set());
   const [persistStateByField, setPersistStateByField] = useState({});
-  // Track pending attaches per field so concurrent attaches (e.g. two
-  // fields after a bulk run) don't clobber each other's loading state.
   const [persistingFields, setPersistingFields] = useState(() => new Set());
-  // Panel-level state that doesn't belong to any single field.
   const [panelError, setPanelError] = useState("");
-  // Bulk run is authoritatively tracked by the AbortController's presence,
-  // not derived from `generatingFields.size` — that derivation flips to
-  // "single" the moment only one bulk request remains in flight.
   const bulkAbortControllerRef = useRef(null);
   const [isBulkRun, setIsBulkRun] = useState(false);
   const isSingleFieldGenerating =
     !isBulkRun && generatingFields.has(selectedField);
 
-  // Cancel any in-flight bulk run when the panel unmounts so leaving the
-  // page doesn't leave orphaned requests that can re-populate state later.
   useEffect(() => {
     return () => {
       bulkAbortControllerRef.current?.abort();
     };
   }, []);
 
-  // Read the cached /auth/me permissions once. `isLoading` lets us hold a
-  // placeholder instead of flashing the panel in once it loads.
   const { data: permissions, isLoading: permissionsLoading } = usePermissions();
   const hasPermission = (permission) =>
     Array.isArray(permissions) && permissions.includes(permission);
-  // The whole panel is only useful to users who can run LLM suggestions.
   const canRunLlm = hasPermission("service:llm:suggest");
-  // Creating + attaching a source needs both the source and resource writes.
   const canAttach =
     hasPermission("source:write") && hasPermission("resource:write");
 
@@ -308,8 +291,6 @@ function AISuggestionPanel({ endpoint, resourceId }) {
       if (signal?.aborted) return;
       setResultsByField((prev) => ({ ...prev, [fieldKey]: suggestion }));
     } catch (err) {
-      // Cancellation isn't a suggestion failure; leave the card in a
-      // clean "not yet generated" state instead of showing an error.
       if (err?.name === "AbortError" || signal?.aborted) return;
       setErrorsByField((prev) => ({
         ...prev,
@@ -341,9 +322,6 @@ function AISuggestionPanel({ endpoint, resourceId }) {
         ),
       );
     } finally {
-      // Only clear if this run is still the current one; a second Enrich
-      // click can't happen while the button is disabled, but the guard
-      // keeps the invariant explicit.
       if (bulkAbortControllerRef.current === controller) {
         bulkAbortControllerRef.current = null;
         setIsBulkRun(false);
@@ -375,9 +353,6 @@ function AISuggestionPanel({ endpoint, resourceId }) {
     const suggestionKey = getSuggestionSubmissionKey(result);
 
     try {
-      // Resolves after the mutation's cache invalidation, so the newly
-      // attached source (and any change to the coalesced winning value)
-      // shows immediately.
       const createdSource = await createSource.mutateAsync({
         resourceId,
         payload: sourcePayload,
@@ -406,8 +381,6 @@ function AISuggestionPanel({ endpoint, resourceId }) {
     }
   }
 
-  // Hold a placeholder until permissions resolve, so the panel doesn't flash
-  // in (or briefly appear then vanish) once /auth/me loads.
   if (permissionsLoading) {
     return (
       <section aria-hidden="true">
@@ -419,7 +392,6 @@ function AISuggestionPanel({ endpoint, resourceId }) {
     );
   }
 
-  // Hide the entire panel from users who can't run LLM suggestions.
   if (!canRunLlm) return null;
 
   const bulkTotal = AI_SUGGESTION_FIELDS.length;
@@ -525,7 +497,6 @@ function OrganizationsSection({ data }) {
   return (
     <div className="flex flex-col md:flex-row">
       <OrgPanel items={owners} nameLabel={FIELD_META.owners.label} />
-      {/* Horizontal divider on mobile, vertical on desktop */}
       <hr className="my-4 border-line md:hidden" />
       <div className="mx-6 hidden w-px self-stretch bg-line md:block" />
       <OrgPanel items={operators} nameLabel={FIELD_META.operators.label} />
@@ -584,8 +555,6 @@ function SourceRow({ source }) {
 
   const sourceLabel = SOURCE_LABELS[source.source] ?? source.source;
   const sourceRecord = sourceDetail?.source_record ?? null;
-  // A curator's overwrite note, when this source was created via the field
-  // overwrite action. Payload is arbitrary JSON, so guard the shape before use.
   const payload = sourceRecord?.payload;
   const overrideNote =
     payload &&
@@ -718,13 +687,7 @@ export default function ResourceDetailPage() {
   const numericId = Number(id);
   const validId = Number.isFinite(numericId);
   const endpoint = "oil-gas-fields";
-  // STIT-418: set by the redirect below when a merged-away id is bounced to its
-  // canonical resource. Ephemeral by design — it lives in router state, so a
-  // fresh load, refresh, or new tab of this URL carries none and shows no
-  // notice; it appears only when the user actually got redirected here.
   const redirectedFrom = location.state?.redirectedFrom ?? null;
-  // Enabled (not manually refetched) so that save mutations' cache
-  // invalidations refetch it — invalidation never refetches disabled queries.
   const {
     data: detailView,
     isLoading,
@@ -733,16 +696,6 @@ export default function ResourceDetailPage() {
 
   useDocumentTitle(detailView?.data?.name ?? "Resource");
 
-  // STIT-418: the API returns the merged-into (root) resource for a repointed
-  // id, so the resolved id can differ from the id in the URL. Redirect to the
-  // canonical URL. replace:true is mandatory: without it, Back returns to the
-  // old id, which re-resolves and redirects again, trapping Back. No cycle guard
-  // is needed beyond the id check — repointing always targets a brand-new row,
-  // so the chain is acyclic and the root never redirects again.
-  //
-  // Coerce with Number() so a string id in the payload still compares and
-  // navigates as a number (a strict `!==` against the numeric URL id would
-  // otherwise loop); NaN when detailView is absent, which the finite check skips.
   const resolvedId = Number(detailView?.id);
   useEffect(() => {
     if (Number.isFinite(resolvedId) && resolvedId !== numericId) {
@@ -790,7 +743,6 @@ export default function ResourceDetailPage() {
             </div>
           </section>
 
-          {/* Identity & Location */}
           <section>
             <SectionHeader title="Identity and location" />
             <FieldGrid>
@@ -808,13 +760,11 @@ export default function ResourceDetailPage() {
             </FieldGrid>
           </section>
 
-          {/* Organizations */}
           <section>
             <SectionHeader title="Organizations" />
             <OrganizationsSection data={detailView.data} />
           </section>
 
-          {/* Production & Geology */}
           <section>
             <SectionHeader title="Production and geology" />
             <FieldGrid>

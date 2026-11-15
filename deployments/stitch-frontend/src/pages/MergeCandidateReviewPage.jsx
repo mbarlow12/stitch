@@ -22,8 +22,6 @@ import {
 } from "../hooks/useResources";
 
 const ENDPOINT = "oil-gas-fields";
-// Tailwind's md breakpoint, where the queue moves beside the decision panel
-// (the md: grid classes in the page layout below).
 const TWO_COLUMN_LAYOUT_QUERY = "(min-width: 48rem)";
 const STATUS_FILTER_LABELS = {
   PENDING: "Pending",
@@ -44,7 +42,6 @@ function getStatusClasses(status) {
   return "border-line bg-surface text-ink";
 }
 
-// PENDING reads as "CANDIDATE": it isn't a real merged resource yet.
 function getStatusLabel(status) {
   return status === "PENDING" ? "CANDIDATE" : status;
 }
@@ -59,8 +56,6 @@ function StatusBadge({ status }) {
   );
 }
 
-// Resource and merged ids aren't shown as list text, but stay one hover away
-// via the title attribute (and remain visible in the detail view facts).
 function candidateSourcesTitle(candidate) {
   const parts = [`Source resources: ${candidate.resource_ids.join(", ")}`];
   if (candidate.merged_resource_id) {
@@ -69,8 +64,6 @@ function candidateSourcesTitle(candidate) {
   return parts.join(" · ");
 }
 
-// The API names each candidate (the merged resource's name once approved);
-// a candidate with no licensed name falls back to its id.
 function candidateDisplayName(candidate) {
   return candidate.name ?? `Candidate #${candidate.id}`;
 }
@@ -100,10 +93,6 @@ function CandidateQueueItem({ candidate, isSelected, onSelect }) {
   );
 }
 
-// Mirrors the resources list search: the box holds its own text while you
-// type, and only submit and clear write to the URL, so typing neither rewrites
-// history nor refetches per keystroke. When the URL's q changes underneath it
-// (Back/Forward), the box is re-seeded to match.
 function QueueSearch({ q, onSearch }) {
   const [searchText, setSearchText] = useState(q);
   const [lastQ, setLastQ] = useState(q);
@@ -115,7 +104,6 @@ function QueueSearch({ q, onSearch }) {
   function handleChange(event) {
     const newValue = event.target.value;
     setSearchText(newValue);
-    // Emptying the box is a clear, not a search for nothing.
     if (newValue === "" && q !== "") onSearch("");
   }
 
@@ -213,8 +201,6 @@ function QueuePanel({
     (sum, count) => sum + count,
     0,
   );
-  // Candidates the Status filter alone would show. When that is zero, the
-  // filter (not the search) is why the list is empty.
   const statusTotal = viewState.statuses.length
     ? viewState.statuses.reduce(
         (sum, status) => sum + (statusCounts[status] ?? 0),
@@ -224,17 +210,10 @@ function QueuePanel({
 
   function handlePageChange(page) {
     viewState.setPage(page);
-    // The list scrolls on its own, so a new page would otherwise open part
-    // way down.
     listRef.current?.scrollTo?.({ top: 0 });
   }
 
   return (
-    // From md up the queue sits in the left column as a sticky, viewport-tall
-    // box whose list scrolls on its own, so scrolling the candidates never
-    // moves the decision panel beside it. It sticks 60px down (top-15) to
-    // clear the non-production EnvironmentBanner, itself sticky at the top
-    // and 46px tall when collapsed; max-h keeps a 1rem gap at the bottom.
     <aside className="min-w-0 rounded-md border border-line bg-panel md:sticky md:top-15 md:col-start-1 md:row-start-1 md:flex md:max-h-[calc(100vh-4.75rem)] md:flex-col md:self-start">
       <div className="shrink-0 border-b border-line px-4 py-3">
         <h2 className="text-base font-semibold text-ink">Queue</h2>
@@ -288,8 +267,7 @@ function QueuePanel({
 
       {candidatePage?.total_count > 0 ? (
         <div className="shrink-0 border-t border-line px-3 pb-3">
-          {/* The URL names the page; the response may still be the previous
-              page's while the requested one loads. */}
+          {}
           <Pagination
             page={viewState.page}
             pageSize={viewState.pageSize}
@@ -430,10 +408,6 @@ function CandidateDecisionPanel({
   } = candidateQuery;
 
   const candidate = detailCandidate ?? listCandidate;
-  // The source resources' detail views, for the per-column source mix in the
-  // comparison. Fetched for the selected candidate only (the queue no longer
-  // loads them, since the API names each candidate), and skipped once merged,
-  // when the merged resource is shown instead of the comparison.
   const sourceDetails = useMergeSourceDetails(
     ENDPOINT,
     candidate?.resource_ids,
@@ -448,9 +422,6 @@ function CandidateDecisionPanel({
     );
   }
 
-  // A detail error only blocks when there is nothing to show. When the queue
-  // item is present it carries every field the panel renders, so the panel
-  // degrades to a banner rather than disappearing.
   if (candidateError && !candidate) {
     return (
       <section className="rounded-md border border-line bg-panel p-5">
@@ -547,9 +518,6 @@ export default function MergeCandidateReviewPage() {
   const viewState = useMergeReviewState();
   const [selectedId, setSelectedId] = useState(null);
   const [reviewNotes, setReviewNotes] = useState("");
-  // The candidate the notes were typed for. The selection also moves without a
-  // click (paging, filtering, sorting, advancing after a review), so the notes
-  // are cleared whenever it changes, never carried to another candidate.
   const [notesCandidateId, setNotesCandidateId] = useState(selectedId);
   if (notesCandidateId !== selectedId) {
     setNotesCandidateId(selectedId);
@@ -562,17 +530,10 @@ export default function MergeCandidateReviewPage() {
   const activeReviewAction = reviewMutation.isPending
     ? reviewMutation.variables?.action
     : null;
-  // A review belongs to the candidate it was submitted for, so forget it
-  // whenever the selection moves, by a click or not. Its error then stays gone
-  // on returning to that candidate, and a review still saving no longer
-  // advances the selection or clears the notes when it finishes: reset()
-  // detaches the callbacks passed to mutate(). The queue still refreshes,
-  // since that runs in the mutation's own onSuccess.
   const { reset: resetReview } = reviewMutation;
   useEffect(() => {
     resetReview();
   }, [selectedId, resetReview]);
-  // Only shown on the candidate whose review failed.
   const actionError =
     reviewMutation.error && reviewMutation.variables?.id === selectedId
       ? reviewMutation.error.message || String(reviewMutation.error)
@@ -588,13 +549,6 @@ export default function MergeCandidateReviewPage() {
   } = useMergeCandidates(ENDPOINT, toMergeCandidateQuery(viewState), true);
   const pageCandidates = candidatePage?.items;
 
-  // Reviewing the last candidate on the last page (or a link to a page that no
-  // longer exists) leaves the page past the end; step back to the new last
-  // page instead of showing an empty queue. An empty result has no pages, so
-  // page 1 counts as its last. Replaces the history entry, since the empty
-  // page was never something the reviewer chose. Waits for the page's own,
-  // up-to-date response: neither the previous page's rows standing in nor a
-  // cached copy that is still refreshing, whose page count may be out of date.
   const lastPage = Math.max(candidatePage?.total_pages ?? 0, 1);
   const pastLastPage =
     Boolean(candidatePage) &&
@@ -606,14 +560,6 @@ export default function MergeCandidateReviewPage() {
     if (pastLastPage) setPage(lastPage, { replace: true });
   }, [pastLastPage, lastPage, setPage]);
 
-  // Select the first pending candidate on the page whenever the selection is
-  // not on it: on first load, and after a page, filter or sort change. Done
-  // during render (not in an effect) so the selection is set before the first
-  // paint and without a cascading re-render. Skipped while the previous
-  // page's rows stand in for the next, so it never lands on a row that is
-  // about to disappear.
-  // An empty page clears the selection instead, so the panel never offers
-  // review actions for a candidate the queue is not showing.
   const selectionOnPage = pageCandidates?.some((c) => c.id === selectedId);
   if (pageCandidates && !selectionOnPage && !listIsPlaceholder) {
     if (pageCandidates.length) {
@@ -629,16 +575,10 @@ export default function MergeCandidateReviewPage() {
     selectedId,
     Boolean(selectedId),
   );
-  // The detail endpoint layers `compare` on top of the list schema, so the
-  // already-loaded queue item stands in for everything except the comparison
-  // until the detail query lands. Without this, review actions dead-click
-  // while the detail is in flight.
   const listCandidate =
     pageCandidates?.find((item) => item.id === selectedId) ?? null;
   const candidate = candidateQuery.data ?? listCandidate;
 
-  // The API counts the whole queue regardless of the status filter, so the
-  // header reports on the whole workload, not just the visible rows.
   const statusCounts = candidatePage?.status_counts;
   const pendingCount = statusCounts?.PENDING ?? 0;
   const reviewedCount =
@@ -647,19 +587,12 @@ export default function MergeCandidateReviewPage() {
 
   function handleSelect(id) {
     setSelectedId(id);
-    // The panel precedes the queue in the DOM (see the layout below), so move
-    // focus to it: the next Tab then reaches the chosen candidate's decision
-    // controls. Focusing must not scroll by itself -- the panel is taller than
-    // the screen, so the browser would jump the page on every click. Scroll
-    // only in the one-column layout, where the panel sits above the queue and
-    // would otherwise change off-screen.
     const panel = selectedPanelRef.current;
     panel?.focus({ preventScroll: true });
     if (!window.matchMedia(TWO_COLUMN_LAYOUT_QUERY).matches) {
       panel?.scrollIntoView({ block: "start" });
     }
     setReviewNotes("");
-    // Clear any error left over from reviewing the previous candidate.
     reviewMutation.reset();
   }
 
@@ -669,9 +602,6 @@ export default function MergeCandidateReviewPage() {
     reviewMutation.mutate(
       { id: candidate.id, action, reviewNotes },
       {
-        // Runs after the mutation's cache invalidation, so the queue advances
-        // once the refreshed data is on its way. Failures surface via
-        // `reviewMutation.error` and keep the current candidate selected.
         onSuccess: () => {
           const nextPending = pageCandidates?.find(
             (item) => item.id !== candidate.id && item.status === "PENDING",
@@ -720,11 +650,6 @@ export default function MergeCandidateReviewPage() {
         </div>
       </header>
 
-      {/* The panel comes first in the DOM so one-column screens show the
-          candidate above the queue, and screen readers and keyboard focus
-          follow the same order. From md up, grid placement moves the queue
-          into the left column; handleSelect keeps keyboard flow working by
-          moving focus to the panel. */}
       <div className="grid gap-6 md:grid-cols-[16rem_minmax(0,1fr)] lg:grid-cols-[20rem_minmax(0,1fr)]">
         <div
           ref={selectedPanelRef}

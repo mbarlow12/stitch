@@ -1,21 +1,3 @@
-/**
- * URL schema for the Merge Review queue.
- *
- * Same contract as the resources list (config/listParams.js): the query string
- * is a complete serialization of the queue view, loading a URL reproduces it
- * for any user, and the param names mirror what the API takes, so there is no
- * translation layer. See the "Merge review URLs" section of the frontend README
- * before changing them.
- *
- * Rules:
- * - Defaults are omitted, so the default view (pending candidates, newest
- *   first, page 1, no search) is a bare /merge-candidate-review.
- * - Serialization order is fixed, so the same view always produces the same URL.
- * - Junk is tolerated, never fatal: an unknown status is dropped, and a
- *   malformed page, page_size or sort falls back to its default.
- * - The default status filter is PENDING, so "no status param" cannot also
- *   mean "every status". Selecting nothing is written as `status=all`.
- */
 import { DEFAULT_PAGE, PAGE_SIZE_OPTIONS } from "../queries/resources";
 
 export const MERGE_STATUSES = ["PENDING", "APPROVED", "DENIED"];
@@ -24,8 +6,6 @@ const ALL_STATUSES = "all";
 
 export const DEFAULT_QUEUE_PAGE_SIZE = 25;
 
-// Each option is one sort_by + sort_order pair the API accepts, labelled in
-// plain language. The first is the default.
 export const QUEUE_SORT_OPTIONS = [
   {
     key: "newest",
@@ -64,7 +44,6 @@ function parsePageSize(raw) {
   return PAGE_SIZE_OPTIONS.includes(value) ? value : DEFAULT_QUEUE_PAGE_SIZE;
 }
 
-// [] means "every status". Returned in MERGE_STATUSES order.
 function parseStatuses(rawValues) {
   if (rawValues.includes(ALL_STATUSES)) return [];
   const statuses = MERGE_STATUSES.filter((status) =>
@@ -73,7 +52,6 @@ function parseStatuses(rawValues) {
   return statuses.length ? statuses : DEFAULT_STATUSES;
 }
 
-// sort_by and sort_order are a unit; an unknown pair falls back to the default.
 function parseSort(rawSortBy, rawSortOrder) {
   return (
     QUEUE_SORT_OPTIONS.find(
@@ -130,8 +108,6 @@ export function toMergeReviewParams({ page, pageSize, q, statuses, sortKey }) {
   return params;
 }
 
-// The list endpoint's query params for a parsed view. An empty status list
-// sends no status filter, which the API reads as every status.
 export function toMergeCandidateQuery({
   page,
   pageSize,

@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager
 from functools import lru_cache
 from typing import Annotated
 
@@ -16,7 +17,7 @@ from stitch.api.observability import register_query_timing
 from stitch.api.settings import get_settings
 
 
-class UnitOfWork:
+class UnitOfWork(AbstractAsyncContextManager):
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
         self._session_factory = session_factory
         self._session: AsyncSession | None = None

@@ -46,10 +46,6 @@ describe("parseListParams", () => {
   });
 
   it("passes unknown filter values through rather than dropping them", () => {
-    // Deliberate: which values are valid is server-side data this module cannot
-    // see, so guessing here would mean duplicating the API's enums. An unknown
-    // free-text value matches nothing; an unknown enum value is the API's 422 to
-    // raise. See the module docstring.
     expect(parse("country=ZZ9").filters.country).toEqual(["ZZ9"]);
     expect(parse("field_status=NotAStatus").filters.field_status).toEqual([
       "NotAStatus",
@@ -134,8 +130,6 @@ describe("toListParams", () => {
 });
 
 describe("remembered page size", () => {
-  // The page size a user chose earlier in the session stands in for the
-  // default when the URL has none (e.g. after the Resources tab or logotype).
   const parseWith = (search, fallbackPageSize) =>
     parseListParams(new URLSearchParams(search), { fallbackPageSize });
   const serializeWith = (state, fallbackPageSize) =>
@@ -155,7 +149,6 @@ describe("remembered page size", () => {
   });
 
   it("keeps an explicit page_size=10 when the remembered size differs", () => {
-    // Otherwise the next write would drop it and the list would jump to 50.
     expect(serializeWith({ ...DEFAULT_STATE, pageSize: 10 }, 50)).toBe(
       "page_size=10",
     );
@@ -180,10 +173,6 @@ describe("remembered page size", () => {
 });
 
 describe("page_size alongside other settings", () => {
-  // With page size remembered per session, a link that leaves page_size out
-  // would open at the recipient's remembered size -- and page=3 at 50 per
-  // page is different rows from page=3 at 10. So any URL carrying other
-  // state also carries page_size; only a bare "/" follows the viewer's size.
   const serializeWith = (state, fallbackPageSize = 10) =>
     decodeURIComponent(toListParams(state, { fallbackPageSize }).toString());
 

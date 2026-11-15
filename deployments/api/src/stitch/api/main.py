@@ -11,6 +11,7 @@ from stitch.observability import (
     configure_tracing,
     instrument_fastapi,
     instrument_httpx,
+    instrument_httpx2,
     resource_attributes_from_env,
     shutdown_tracing,
 )
@@ -86,3 +87,4 @@ app.mount("/v2", stitch_api_v2)
 
 if _tracer_provider is not None:
     instrument_httpx()
+    instrument_httpx2()

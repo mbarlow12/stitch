@@ -23,7 +23,6 @@ describe("getCountryName", () => {
   });
 
   it("does not match lowercase codes (data is uppercase alpha-3)", () => {
-    // Lookup is case-sensitive; lowercase isn't a known code, so it passes through.
     expect(getCountryName("nor")).toBe("nor");
   });
 });

@@ -4,7 +4,6 @@ const STATE_STYLES = {
   failed: "border-danger/25 bg-danger-soft text-danger",
 };
 
-// Job-state pill used by the ETL batch-workflow page.
 export default function StateBadge({ state }) {
   if (!state) return null;
 

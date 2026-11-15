@@ -13,8 +13,6 @@ export default function FilterBar({
     optionParams,
   );
 
-  // Flatten active filters into chips: [{ field, label, value, displayValue }, ...]
-  // `value` is the stored/API value; `displayValue` is what the user sees.
   const chips = FILTER_FIELDS.flatMap(({ key, label, formatValue }) =>
     (filters[key] ?? []).map((value) => ({
       field: key,
@@ -37,7 +35,6 @@ export default function FilterBar({
 
   return (
     <div className="space-y-2" data-testid="filter-bar">
-      {/* Dropdowns row */}
       <div className="flex flex-wrap gap-2">
         {FILTER_FIELDS.map(({ key, label, formatValue, searchable }) => {
           const options = (filterOptions?.[key] ?? [])
@@ -60,7 +57,6 @@ export default function FilterBar({
         })}
       </div>
 
-      {/* Chips + clear button — only rendered when at least one filter is active */}
       {chips.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {chips.map(({ field, label, value, displayValue }) => (

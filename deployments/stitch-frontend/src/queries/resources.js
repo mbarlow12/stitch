@@ -12,18 +12,8 @@ import {
 export const DEFAULT_STALE_TIME = 60_000;
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_PAGE_SIZE = 10;
-// Page sizes the paginator offers and the URL schema accepts.
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
-// Private key builders, hierarchical for easy invalidation. Not exported:
-// every queryKey a caller could need comes back attached to the matching
-// resourceQueries factory below, so a key and its fetcher can never drift
-// apart the way a separately-maintained registry allowed.
-//
-// Every key here is prefixed by [endpoint] — mutations rely on that
-// invariant to invalidate a whole endpoint's cache with a single-segment
-// key. resources.test.js guards it; keep any new factory prefixed the same
-// way.
 const keys = {
   all: (endpoint = "resources") => [endpoint],
   lists: (endpoint = "resources") => [...keys.all(endpoint), "list"],
@@ -57,11 +47,6 @@ const keys = {
   ],
 };
 
-// Query definitions. Each factory returns queryKey + queryFn + options
-// together; the same object is what a hook passes to useQuery and what a
-// caller reads .queryKey off of to invalidate/reset/setQueryData that exact
-// query. Gating (enabled) is a hook-layer concern — see useResources.js —
-// so it isn't set here.
 export const resourceQueries = {
   list: (
     config,
@@ -92,9 +77,6 @@ export const resourceQueries = {
           sort_order,
         }),
       staleTime: DEFAULT_STALE_TIME,
-      // Keeps showing the previous page's rows (dimmed, in ResourcesTable)
-      // while a new page/filter/sort combination fetches, instead of the
-      // table flashing to empty for the duration of the request.
       placeholderData: keepPreviousData,
     }),
 
@@ -131,15 +113,11 @@ export const resourceQueries = {
       queryFn: (fetcher) => getResource(config, id, fetcher, endpoint),
     }),
 
-  // `params` is { page, page_size, q, status, sort_by, sort_order }; see
-  // getMergeCandidates.
   mergeCandidates: (config, endpoint = "oil-gas-fields", params = {}) =>
     queryOptions({
       queryKey: keys.mergeCandidateList(endpoint, params),
       queryFn: (fetcher) =>
         getMergeCandidates(config, fetcher, endpoint, params),
-      // Keeps the previous page's queue on screen while the next page or
-      // filter fetches, instead of the queue flashing to a loading state.
       placeholderData: keepPreviousData,
     }),
 

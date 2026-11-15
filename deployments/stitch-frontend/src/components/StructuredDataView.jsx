@@ -66,7 +66,6 @@ function getSnapshotKey(item, index) {
     return item.id;
   }
 
-  // Nested arrays render as read-only snapshots, so position is the fallback.
   return `snapshot-${index}`;
 }
 

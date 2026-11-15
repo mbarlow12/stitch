@@ -63,8 +63,6 @@ describe("AuthGate", () => {
   });
 
   describe("when a request fails", () => {
-    // Shapes of the errors auth0-spa-js throws from getAccessTokenSilently, and
-    // of the HTTP errors thrown by queries/api.js.
     const authError = (code) => Object.assign(new Error(code), { error: code });
     const httpError = (status) =>
       Object.assign(new Error(`HTTP error! status: ${status}`), { status });

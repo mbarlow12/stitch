@@ -7,8 +7,6 @@ import MergeCandidateReviewPage from "./MergeCandidateReviewPage";
 import { useMergeCandidates, useMergeCandidate } from "../hooks/useResources";
 import { reviewMergeCandidate, getResourceDetail } from "../queries/api";
 
-// Mock only the read hooks; the review path exercises the real
-// useReviewMergeCandidate mutation against the mocked API module.
 vi.mock("../hooks/useResources", async (importOriginal) => ({
   ...(await importOriginal()),
   useMergeCandidates: vi.fn(),
@@ -59,7 +57,6 @@ const candidates = [
 
 const pendingCandidate = candidates[0];
 
-// Detail responses layer `compare` on top of the list schema.
 const pendingDetail = {
   ...pendingCandidate,
   compare: [
@@ -85,7 +82,6 @@ const pendingDetail = {
     },
   ],
 };
-// No licensed source carries a name, so the UI falls back to the id.
 const nextPendingCandidate = {
   id: 13,
   name: null,
@@ -94,7 +90,6 @@ const nextPendingCandidate = {
   merged_resource_id: null,
 };
 
-// Every status, so approved candidates are listed too.
 const ALL_STATUSES_URL = "/?status=all";
 
 const defaultHookReturn = {
@@ -105,9 +100,6 @@ const defaultHookReturn = {
   refetch: vi.fn(),
 };
 
-// Stands in for the list endpoint: applies the requested status filter,
-// returns the requested page, and counts the whole queue by status, as the API
-// does. (Sorting is the API's job; tests check the params sent instead.)
 function mockQueue(allCandidates) {
   vi.mocked(useMergeCandidates).mockImplementation((_endpoint, params) => {
     const page = params?.page ?? 1;
@@ -136,7 +128,6 @@ function mockQueue(allCandidates) {
   });
 }
 
-// The params of the most recent list request.
 function lastQueueRequest() {
   return vi.mocked(useMergeCandidates).mock.lastCall[1];
 }
@@ -174,9 +165,6 @@ describe("MergeCandidateReviewPage", () => {
   });
 
   it("puts the candidate panel before the queue in reading order", () => {
-    // On one-column screens the panel is shown first. Keeping that order in
-    // the DOM (not just visually) means screen readers and keyboard focus
-    // meet the candidate before the queue, matching what is on screen.
     renderWithQueryClient(<MergeCandidateReviewPage />);
 
     const panel = screen.getByRole("article");
@@ -190,8 +178,6 @@ describe("MergeCandidateReviewPage", () => {
   });
 
   describe("selecting a candidate", () => {
-    // jsdom has neither matchMedia nor scrollIntoView, so each test stubs the
-    // layout it needs: two columns (md and up) or one.
     let scrollIntoView;
 
     function useLayout({ twoColumns }) {
@@ -232,22 +218,17 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("moves focus to the candidate panel", async () => {
-      // The panel precedes the queue in the DOM, so without this, Tab from the
-      // chosen queue item would move away from its decision controls.
       useLayout({ twoColumns: true });
       const user = await selectCandidate13();
 
       const panel = screen.getByRole("region", { name: "Selected candidate" });
       expect(panel).toHaveFocus();
 
-      // The next Tab lands inside the panel, on the way to Deny/Approve.
       await user.tab();
       expect(panel).toContainElement(document.activeElement);
     });
 
     it("does not scroll the page in the two-column layout", async () => {
-      // The panel is beside the queue, so scrolling would only make the page
-      // jump under the reviewer's pointer.
       useLayout({ twoColumns: true });
       await selectCandidate13();
 
@@ -255,8 +236,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("scrolls the panel into view in the one-column layout", async () => {
-      // The panel sits above the queue, so without this the change happens
-      // off-screen.
       useLayout({ twoColumns: false });
       await selectCandidate13();
 
@@ -326,8 +305,6 @@ describe("MergeCandidateReviewPage", () => {
     expect(
       screen.getByRole("button", { name: /Arabian Merged/ }),
     ).toBeInTheDocument();
-    // Only the selected candidate's resources are fetched, for its source
-    // mix; the other rows' resources (201, 202, 301) are not.
     const fetchedIds = vi
       .mocked(getResourceDetail)
       .mock.calls.map(([, id]) => id);
@@ -422,8 +399,6 @@ describe("MergeCandidateReviewPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Approve merge" }));
 
-    // An approved merge changes the resources themselves, so everything under
-    // the endpoint (lists, details, merge candidates) must be refetched.
     await waitFor(() => {
       expect(invalidateSpy).toHaveBeenCalledWith({
         queryKey: ["oil-gas-fields"],
@@ -540,7 +515,6 @@ describe("MergeCandidateReviewPage", () => {
       data: mergedCandidate,
     });
 
-    // The only candidate is approved, which the default (pending) view hides.
     renderWithQueryClient(<MergeCandidateReviewPage />, {
       initialEntries: [ALL_STATUSES_URL],
     });
@@ -563,7 +537,6 @@ describe("MergeCandidateReviewPage", () => {
       initialEntries: [ALL_STATUSES_URL],
     });
 
-    // The merged resource replaces the comparison, so its source mix is unused.
     expect(screen.getByText("Merged resource 301")).toBeInTheDocument();
     expect(getResourceDetail).not.toHaveBeenCalled();
   });
@@ -571,13 +544,11 @@ describe("MergeCandidateReviewPage", () => {
   it("shows the merged resource's name in the heading once merged", async () => {
     const mergedCandidate = candidates[1];
     mockQueue([mergedCandidate]);
-    // Post-merge, the originals are null shells: compare carries no name.
     vi.mocked(useMergeCandidate).mockReturnValue({
       ...defaultHookReturn,
       data: { ...mergedCandidate, compare: [] },
     });
 
-    // The only candidate is approved, which the default (pending) view hides.
     renderWithQueryClient(<MergeCandidateReviewPage />, {
       initialEntries: [ALL_STATUSES_URL],
     });
@@ -598,7 +569,6 @@ describe("MergeCandidateReviewPage", () => {
       data: mergedCandidate,
     });
 
-    // The only candidate is approved, which the default (pending) view hides.
     renderWithQueryClient(<MergeCandidateReviewPage />, {
       initialEntries: [ALL_STATUSES_URL],
     });
@@ -642,15 +612,12 @@ describe("MergeCandidateReviewPage", () => {
       return screen.getByRole("heading", { name: "Queue" }).closest("aside");
     }
 
-    // Queue rows are the toggle buttons; the queue also holds the filter and
-    // paging buttons.
     function queueItems() {
       return within(queue())
         .queryAllByRole("button")
         .filter((button) => button.hasAttribute("aria-pressed"));
     }
 
-    // The header counts live in a <dt>/<dd> pair; read the value beside a label.
     function countFor(label) {
       const header = screen
         .getByRole("heading", { name: "Merge review" })
@@ -754,7 +721,6 @@ describe("MergeCandidateReviewPage", () => {
         ],
       });
 
-      // The first request; this small fixture then steps back from page 2.
       expect(vi.mocked(useMergeCandidates).mock.calls[0][1]).toEqual({
         page: 2,
         page_size: 10,
@@ -785,7 +751,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("clears the notes when paging moves the selection", async () => {
-      // No detail loaded, so the panel acts on the selected queue row.
       vi.mocked(useMergeCandidate).mockReturnValue(defaultHookReturn);
       const user = userEvent.setup();
       mockQueue(manyPending(30));
@@ -794,7 +759,6 @@ describe("MergeCandidateReviewPage", () => {
       await user.type(screen.getByLabelText("Decision notes"), "For field 1");
       await user.click(screen.getByRole("button", { name: "Next page" }));
 
-      // Field 26 (id 125) is selected now; field 1's notes must not follow it.
       expect(screen.getByLabelText("Decision notes")).toHaveValue("");
       await user.click(screen.getByRole("button", { name: "Approve merge" }));
       await waitFor(() => {
@@ -810,7 +774,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("does not show a failed review's error on the next page's candidate", async () => {
-      // No detail loaded, so the panel acts on the selected queue row.
       vi.mocked(useMergeCandidate).mockReturnValue(defaultHookReturn);
       vi.mocked(reviewMergeCandidate).mockRejectedValue(
         new Error("Review failed"),
@@ -828,7 +791,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("does not show a failed review's error again on returning to its candidate", async () => {
-      // No detail loaded, so the panel acts on the selected queue row.
       vi.mocked(useMergeCandidate).mockReturnValue(defaultHookReturn);
       vi.mocked(reviewMergeCandidate).mockRejectedValue(
         new Error("Review failed"),
@@ -843,7 +805,6 @@ describe("MergeCandidateReviewPage", () => {
       await user.click(screen.getByRole("button", { name: "Next page" }));
       await user.click(screen.getByRole("button", { name: "Previous page" }));
 
-      // Field 1 is selected again, but its review is over.
       expect(
         screen.getByRole("button", { name: /^Field 1(?!\d)/ }),
       ).toHaveAttribute("aria-pressed", "true");
@@ -851,7 +812,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("leaves the new page alone when a review finishes after paging", async () => {
-      // No detail loaded, so the panel acts on the selected queue row.
       vi.mocked(useMergeCandidate).mockReturnValue(defaultHookReturn);
       let finishReview;
       vi.mocked(reviewMergeCandidate).mockReturnValue(
@@ -898,7 +858,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("shows the requested page in the pager while it loads", () => {
-      // Page 2 is still loading, so the previous page's response stands in.
       const pageOne = manyPending(30).slice(0, 25);
       vi.mocked(useMergeCandidates).mockReturnValue({
         ...defaultHookReturn,
@@ -924,8 +883,6 @@ describe("MergeCandidateReviewPage", () => {
     });
 
     it("waits for a cached page to refresh before stepping back", () => {
-      // A cached copy from when page 2 was past the end; new candidates have
-      // arrived since, and the refresh is still in flight.
       vi.mocked(useMergeCandidates).mockReturnValue({
         ...defaultHookReturn,
         data: {
@@ -954,7 +911,6 @@ describe("MergeCandidateReviewPage", () => {
         screen.getByRole("heading", { name: "Bergan" }),
       ).toBeInTheDocument();
 
-      // Only approved candidates, of which there are none.
       await toggleStatus(user, "Approved");
       await user.click(screen.getByRole("checkbox", { name: /Pending/ }));
 
@@ -991,7 +947,6 @@ describe("MergeCandidateReviewPage", () => {
         });
 
         await user.type(searchBox(), "  ghawar  ");
-        // Typing alone does not search.
         expect(lastQueueRequest().q).toBeUndefined();
 
         await user.click(
@@ -1036,8 +991,6 @@ describe("MergeCandidateReviewPage", () => {
         expect(lastQueueRequest().q).toBe("ghawar");
       });
 
-      // mockQueue ignores q, so these stand in for a search that matches
-      // nothing while the queue itself has candidates.
       function mockEmptySearch(statusCounts) {
         vi.mocked(useMergeCandidates).mockReturnValue({
           ...defaultHookReturn,
@@ -1083,7 +1036,6 @@ describe("MergeCandidateReviewPage", () => {
       });
 
       it("never calls a queue with work empty, even when a page comes back empty", () => {
-        // e.g. a page past the end, before the step back lands.
         mockEmptySearch({ PENDING: 2 });
         renderWithQueryClient(<MergeCandidateReviewPage />);
 
@@ -1118,7 +1070,6 @@ describe("MergeCandidateReviewPage", () => {
   });
 
   describe("sorting the queue", () => {
-    // The API lists these newest first: 21, 22, 23.
     const zubair = {
       id: 21,
       name: "Zubair",
@@ -1189,7 +1140,6 @@ describe("MergeCandidateReviewPage", () => {
         sort_by: "name",
         sort_order: "asc",
       });
-      // The API's order is shown as is: the page does not re-sort it.
       expect(queueOrder()).toEqual(["Zubair", "Burgan"]);
     });
 

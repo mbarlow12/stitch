@@ -57,8 +57,6 @@ function OtherAttributesAccordion({ detail }) {
   );
 }
 
-// Read-only view of the resource a merge candidate produced, shown in place of
-// the source comparison once the merge has run.
 export default function MergedResourceView({ endpoint, resourceId }) {
   const {
     data: detail,

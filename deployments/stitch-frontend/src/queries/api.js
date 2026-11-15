@@ -205,8 +205,6 @@ export async function createSourceForResource(
   return await response.json();
 }
 
-// `status` is a list sent as a repeated param (any of them matches); omitted,
-// the API returns every status. `q` searches the candidates' resources.
 export async function getMergeCandidates(
   config,
   fetcher,

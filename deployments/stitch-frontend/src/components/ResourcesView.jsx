@@ -42,11 +42,6 @@ export default function ResourcesView({ className = "", endpoint }) {
     setFilters,
   } = useListState();
 
-  // The search box holds its own text while you type; only submit and clear
-  // write to the URL, so typing does not rewrite history or refetch per
-  // keystroke. When the URL's q changes underneath us — back/forward, or the
-  // logotype reset — re-seed the box to match. This is React's documented
-  // "adjusting state when a prop changes" pattern, which avoids an effect.
   const [searchText, setSearchText] = useState(q);
   const [lastQ, setLastQ] = useState(q);
   if (q !== lastQ) {
@@ -54,10 +49,6 @@ export default function ResourcesView({ className = "", endpoint }) {
     setSearchText(q);
   }
 
-  // The controls reflect every click immediately, but the query waits until
-  // clicking settles so a burst of filter/sort/page changes sends one request.
-  // The params are serialized because `filters` is a new object each render,
-  // which would otherwise restart the debounce timer forever.
   const listParamsKey = JSON.stringify({
     page,
     page_size: pageSize,
@@ -68,8 +59,6 @@ export default function ResourcesView({ className = "", endpoint }) {
   });
   const debouncedListParamsKey = useDebouncedValue(listParamsKey);
 
-  // Rebuilt field by field: JSON drops undefined keys, and useResources should
-  // see the same param shape whether or not a search or sort is active.
   const settledListParams = JSON.parse(debouncedListParamsKey);
 
   const { data, isLoading, isFetching, isError, error, refetch } = useResources(

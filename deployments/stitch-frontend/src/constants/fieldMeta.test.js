@@ -5,7 +5,6 @@ import {
   MERGE_COMPARISON_OTHER_FIELDS,
 } from "./fieldMeta";
 
-// Mirrors MERGE_COMPARISON_LEAD_OTHER_FIELDS, which is private to the module.
 const LEAD_FIELDS = ["field_status", "production_start_year"];
 
 describe("merge comparison field constants", () => {

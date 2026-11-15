@@ -1,16 +1,3 @@
-/**
- * Country code helpers.
- *
- * Field data stores country as an ISO 3166-1 alpha-3 code (e.g. "NOR").
- * The UI should display the conventional country name instead.
- *
- * Rather than hard-code a name dictionary, we keep only an alpha-3 -> alpha-2
- * lookup and resolve the human-readable name at runtime via the platform
- * `Intl.DisplayNames` API. This keeps the names localizable and avoids shipping
- * (and maintaining) a static list of country names.
- */
-
-// ISO 3166-1: alpha-3 -> alpha-2. Codes only; names come from Intl.DisplayNames.
 export const ALPHA3_TO_ALPHA2 = {
   ABW: "AW",
   AFG: "AF",
@@ -275,11 +262,6 @@ function regionNames() {
   return _regionNames;
 }
 
-/**
- * Resolve an ISO 3166-1 alpha-3 code to a conventional country name.
- * Falls back to the original value when the code is unknown or unmappable,
- * so unexpected/blank values still render sensibly.
- */
 export function getCountryName(code) {
   if (!code) return code;
   const alpha2 = ALPHA3_TO_ALPHA2[code];

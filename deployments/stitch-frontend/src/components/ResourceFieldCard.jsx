@@ -26,9 +26,6 @@ import {
 import { FIELD_META } from "../constants/fieldMeta";
 
 const RESOURCE_WRITE = "resource:write";
-// Reordering rewrites the whole per-field override set, so the API requires read
-// access to every source (not just this resource's) on top of resource:write.
-// Gate the affordance the same way so it only appears to curators who can save.
 const ALL_SOURCE_READ_PERMISSIONS = SOURCES.map(
   (source) => `source:read:${source}`,
 );
@@ -37,11 +34,6 @@ function arraysEqual(a, b) {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
-// Build a bare "RMI" (rmi) source that populates only `fieldKey`, to
-// be created and attached to the resource. `name`/`country` are required-present
-// keys on the field model (null unless the panel's field IS name/country — the
-// [fieldKey] spread then overrides the null). The curator's note and an audit
-// breadcrumb ride along in `source_record.payload`.
 function buildRmiSourcePayload({ fieldKey, value, note }) {
   return {
     source: "rmi",
@@ -72,7 +64,6 @@ function SourceValueRow({
     sourceId !== null && sourceId !== undefined
       ? `${sourceLabel} · #${sourceId}`
       : sourceLabel;
-  // Quote strings to set text values apart; render numbers/booleans bare.
   const display = typeof value === "string" ? `"${value}"` : String(value);
 
   return (
@@ -123,11 +114,6 @@ function MoveButtons({ onMoveUp, onMoveDown, canMoveUp, canMoveDown, label }) {
   );
 }
 
-// The value entry form, revealed after the curator clicks "+". Lets them enter a
-// new "RMI" value (with an optional note) for this field; on Save it
-// creates and attaches an rmi source to the resource. Fields the API limits to
-// a fixed set of values get a dropdown of exactly those values instead of free
-// text, so a save can't be rejected for an unknown value.
 function AddSourceForm({ endpoint, resourceId, fieldKey, onSaved }) {
   const createSource = useCreateSourceForResource(endpoint);
   const allowedValues = FIELD_META[fieldKey]?.options;
@@ -151,13 +137,10 @@ function AddSourceForm({ endpoint, resourceId, fieldKey, onSaved }) {
     });
 
     try {
-      // Resolves after the mutation's cache invalidation, so the refreshed
-      // data is on its way before the form closes.
       await createSource.mutateAsync({ resourceId, payload });
       onSaved();
     } catch {
-      // Surfaced via `createSource.error` above; the form stays mounted with
-      // the draft intact so the curator can retry.
+      return;
     }
   }
 
@@ -225,12 +208,8 @@ function FieldSourcesPanel({
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
-  // Keep the value form hidden until the curator clicks "+", to reduce clutter.
   const [isAdding, setIsAdding] = useState(false);
   const [workingOrder, setWorkingOrder] = useState([]);
-  // The order captured when editing began. `orderChanged` and the stale-panel
-  // check both compare against this snapshot -- not the live `originalOrder` --
-  // so a background refetch can't be mistaken for a user edit.
   const [baselineOrder, setBaselineOrder] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -244,21 +223,10 @@ function FieldSourcesPanel({
     [sources],
   );
 
-  // Reordering needs resource:write, read access to every source (so the save
-  // acts on a complete picture -- see the priority route), and at least two
-  // sources to swap.
   const canReorder =
     canWriteResource && canReadAllSources && sources.length > 1;
-  // The Edit affordance opens the shared edit mode for either capability:
-  // reordering the existing sources or adding a new value.
   const canEnterEdit = canReorder || canEdit;
-  // Did the curator actually reorder? Compared against the edit-start snapshot, so
-  // a background refetch shifting `originalOrder` can't spuriously enable Save.
   const orderChanged = isEditing && !arraysEqual(workingOrder, baselineOrder);
-  // Did the underlying sources diverge from what the curator started editing --
-  // an added/removed source, or someone else's re-order of the same set? Either
-  // way the working order is stale and a save would overwrite newer state, so
-  // surface a notice and block it until the curator re-opens from the fresh list.
   const sourcesChanged =
     isEditing && !arraysEqual(baselineOrder, originalOrder);
 
@@ -301,8 +269,6 @@ function FieldSourcesPanel({
         fetcher,
         endpoint,
       );
-      // Refresh both the per-field ranking and the resource detail (its coalesced
-      // winner / collapsed value may have changed).
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: resourceQueries.fieldSources(
@@ -331,8 +297,6 @@ function FieldSourcesPanel({
 
   return (
     <div className="mt-2 space-y-2 rounded-md border border-line bg-panel p-3">
-      {/* Wraps so the actions drop below the label in narrow cards (the
-          four-column grid) instead of pushing Save past the card's edge. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
           All sources
@@ -400,8 +364,6 @@ function FieldSourcesPanel({
       )}
       {!isLoading && !isError && sources.length > 0 && (
         <div className="space-y-1.5">
-          {/* Index 0 is the winner in both read (best-first from the API) and edit
-              (top of the working order) modes. */}
           {displayRows.map((row, idx) => (
             <SourceValueRow
               key={`${row.source}-${row.source_id}`}
@@ -429,11 +391,6 @@ function FieldSourcesPanel({
   );
 }
 
-// A FieldCard for the resource detail page: clicking a populated value lazily
-// fetches every source's value for that field and shows them in priority order.
-// With `resource:write`, the panel also allows reordering sources for the field.
-// Curators (source:write + resource:write) can also expand a field that has no
-// values yet, to add the first one.
 export default function ResourceFieldCard({
   endpoint,
   resourceId,
@@ -443,14 +400,11 @@ export default function ResourceFieldCard({
   source,
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  // Creating + attaching a source needs both writes, matching
-  // POST /oil-gas-fields/{id}/sources. Call both hooks unconditionally.
   const canWriteSource = useHasPermission("source:write");
   const canWriteResource = useHasPermission("resource:write");
   const canEdit = canWriteSource && canWriteResource;
 
   const hasValue = value !== null && value !== undefined && value !== "";
-  // Editors can also open empty fields to add the first value.
   const expandable = hasValue || canEdit;
   const { data, isLoading, isError } = useFieldSourceValues(
     endpoint,

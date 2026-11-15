@@ -1,10 +1,5 @@
 import { getCountryName } from "../constants/countries";
 
-// Add entries here to expose new filter dropdowns.
-// `formatValue` (optional) maps the stored value to a display label; the raw
-// value is still what gets sent to the API as the filter.
-// `searchable` (optional) adds a type-to-filter box to the dropdown, for the
-// long, open-ended lists; short fixed lists don't need one.
 export const FILTER_FIELDS = [
   {
     key: "country",

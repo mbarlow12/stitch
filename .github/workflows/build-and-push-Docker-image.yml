@@ -69,7 +69,6 @@ jobs:
           echo "$DOCKERFILE_LABELS" >> "$GITHUB_OUTPUT"
           echo 'EOF' >> "$GITHUB_OUTPUT"
 
-      # Setup docker metadata, including tags and labels (and annotations)
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v6
@@ -99,7 +98,6 @@ jobs:
       - name: Log in to registry
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      # Actually build the image (for a single architecture)!
       - name: Build
         id: build
         uses: docker/build-push-action@v7
