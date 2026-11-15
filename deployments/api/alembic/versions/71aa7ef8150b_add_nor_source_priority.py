@@ -1,16 +1,9 @@
-"""add nor source priority
-
-Revision ID: 71aa7ef8150b
-Revises: 3a7e120d22d1
-Create Date: 2026-09-23 00:00:00.000000
-"""
 
 from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
 
-# revision identifiers, used by Alembic.
 revision = "71aa7ef8150b"
 down_revision = "3a7e120d22d1"
 branch_labels = None

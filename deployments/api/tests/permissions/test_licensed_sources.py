@@ -1,4 +1,3 @@
-"""Tests for stitch.api.permissions.licensed_sources."""
 
 from stitch.auth import TokenClaims
 
@@ -29,8 +28,8 @@ def test_multiple_valid_sources_deduped():
 def test_malformed_permission_strings_ignored():
     claims = _claims(
         "no-prefix",
-        "source:read:",  # empty source segment
-        "source:read:rmi:extra",  # trailing segment is not a valid source
+        "source:read:",
+        "source:read:rmi:extra",
     )
     assert licensed_sources(claims) == frozenset()
 

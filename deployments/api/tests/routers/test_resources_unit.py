@@ -1,4 +1,3 @@
-"""Unit tests for resources router with mocked dependencies."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -14,7 +13,6 @@ from tests.factories import ResourceCreateFactory, SourceFactory
 
 
 class TestGetResourceUnit:
-    """Unit tests for GET /resources/{id} endpoint."""
 
     @pytest.mark.anyio
     async def test_returns_resource_when_found(
@@ -24,7 +22,6 @@ class TestGetResourceUnit:
         og_res_fact: ResourceCreateFactory,
         source_maker: SourceFactory,
     ):
-        """GET /resources/{id} returns resource from repository."""
         expected = og_res_fact(
             id=42,
             empty=False,
@@ -45,12 +42,10 @@ class TestGetResourceUnit:
         view_data = response.json()
         assert view_data["id"] == 42
         assert view_data["name"] == "Found Resource"
-        # Requested id matches the resolved id, so no redirect flag is set.
         assert view_data["requested_resource_id"] is None
 
     @pytest.mark.anyio
     async def test_returns_404_when_not_found(self, async_client, mock_uow):
-        """GET /resources/{id} returns 404 when resource not found."""
 
         async def override_get_uow():
             yield mock_uow
@@ -72,7 +67,6 @@ class TestGetResourceUnit:
 
 
 class TestCreateResourceUnit:
-    """Unit tests for POST /resources/ endpoint."""
 
     @pytest.mark.anyio
     async def test_creates_resource_with_user(
@@ -83,7 +77,6 @@ class TestCreateResourceUnit:
         og_res_fact: ResourceCreateFactory,
         source_maker: SourceFactory,
     ):
-        """POST /resources/ calls repo.create with user and data."""
         src = source_maker(id=1, source="wm")
         expected = og_res_fact(id=123, source_data=[src])
         in_src = source_maker(source="wm", name="New Resource")
@@ -116,7 +109,6 @@ class TestCreateResourceUnit:
         source_maker: SourceFactory,
         og_res_fact: ResourceCreateFactory,
     ):
-        """POST /resources/ returns the created resource entity."""
         src = source_maker(id=1, source="wm", name="Created Resource")
         expected = og_res_fact(id=456, source_data=[src])
         src_in = source_maker(managed=False, source="wm", name="Created Resource")
@@ -144,7 +136,6 @@ class TestCreateResourceUnit:
 
     @pytest.mark.anyio
     async def test_validates_request_body(self, async_client, mock_uow):
-        """POST /resources/ returns 422 for invalid request body with bad source_data."""
 
         async def override_get_uow():
             yield mock_uow
@@ -157,7 +148,6 @@ class TestCreateResourceUnit:
 
 
 class TestGetAllResourcesUnit:
-    """Unit tests for GET /oil-gas-fields/ paginated endpoint."""
 
     @pytest.mark.anyio
     async def test_returns_paginated_response(
@@ -165,7 +155,6 @@ class TestGetAllResourcesUnit:
         async_client,
         mock_uow,
     ):
-        """GET /oil-gas-fields/ returns envelope with items and metadata."""
         list_items = [
             OGFieldListItemView(
                 id=i,
@@ -198,7 +187,6 @@ class TestGetAllResourcesUnit:
         async_client,
         mock_uow,
     ):
-        """GET /oil-gas-fields/?page=2&page_size=10 passes params to query."""
 
         async def override_get_uow():
             yield mock_uow
@@ -219,7 +207,6 @@ class TestGetAllResourcesUnit:
 
 
 class TestListResourcesMultiValueFiltersUnit:
-    """A repeated filter param must reach the query as every value, not the last."""
 
     @pytest.mark.anyio
     async def test_repeated_filter_param_keeps_every_value(
@@ -243,7 +230,6 @@ class TestListResourcesMultiValueFiltersUnit:
 
     @pytest.mark.anyio
     async def test_single_filter_param_still_works(self, async_client, mock_uow):
-        """Old single-valued URLs and bookmarks keep working."""
 
         async def override_get_uow():
             yield mock_uow
@@ -260,7 +246,6 @@ class TestListResourcesMultiValueFiltersUnit:
 
 
 class TestGetResourceFilterOptionsUnit:
-    """Unit tests for GET /oil-gas-fields/filter-options endpoint."""
 
     @pytest.mark.anyio
     async def test_returns_filter_options(self, async_client, mock_uow):
@@ -327,7 +312,6 @@ class TestGetResourceFilterOptionsUnit:
 
     @pytest.mark.anyio
     async def test_passes_filter_params(self, async_client, mock_uow):
-        """The current selections reach the action, so options can cascade."""
 
         async def override_get_uow():
             yield mock_uow
@@ -359,7 +343,6 @@ class TestGetResourceFilterOptionsUnit:
 
     @pytest.mark.anyio
     async def test_no_query_string_still_works(self, async_client, mock_uow):
-        """Every param is optional: callers that send none are unaffected."""
 
         async def override_get_uow():
             yield mock_uow

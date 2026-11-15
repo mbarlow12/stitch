@@ -14,9 +14,6 @@ PORTABLE_FLOAT = (
     .with_variant(sqlite.REAL(), "sqlite")
 )
 
-# JSON column where a Python ``None`` binds to SQL NULL (not the JSON ``null``
-# literal). Needed so the long values table's "exactly one column populated"
-# check sees an unset value column as truly NULL.
 PORTABLE_JSON_NULL = JSON(none_as_null=True).with_variant(
     postgresql.JSONB(none_as_null=True), "postgresql"
 )

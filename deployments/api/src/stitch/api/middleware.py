@@ -28,6 +28,4 @@ def register_middlewares(application: FastAPI, settings: Settings):
         allow_methods=ALLOWED_METHODS,
         allow_headers=ALLOWED_HEADERS,
     )
-    # Added last so it is the outermost middleware and times the full request,
-    # including time spent in CORS handling.
     application.add_middleware(RequestTimingMiddleware)

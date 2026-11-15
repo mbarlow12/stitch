@@ -1,4 +1,3 @@
-# pyright: reportUnannotatedClassAttribute=false
 from collections.abc import Callable
 from polyfactory import Require, Use
 from polyfactory.decorators import post_generated

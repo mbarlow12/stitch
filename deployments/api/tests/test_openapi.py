@@ -1,10 +1,9 @@
-# Check that the open api schema generates sucessfully (fails if Self is used).
 def test_openapi_schema_generates():
     from stitch.api.main import app
 
-    schema = app.openapi()  # should not raise
+    schema = app.openapi()
     assert schema["openapi"].startswith("3.")
-    assert "paths" in schema and schema["paths"]  # sanity check: not empty
+    assert "paths" in schema and schema["paths"]
 
 
 def _resolve_component_schema(schema: dict, schema_ref: dict) -> dict:
@@ -64,8 +63,6 @@ def test_openapi_exposes_client_library_contract():
     assert detail_component["type"] == "object"
     assert {"id", "data"}.issubset(detail_component["properties"])
 
-    # STIT-418: the single-resource read views expose the redirect flag so a
-    # client can tell the returned resource is not the one it requested.
     get_operation = paths["/api/v1/oil-gas-fields/{id}"]["get"]
     get_schema = get_operation["responses"]["200"]["content"]["application/json"][
         "schema"

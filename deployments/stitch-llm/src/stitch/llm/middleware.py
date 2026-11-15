@@ -25,5 +25,4 @@ def register_middlewares(application: FastAPI, settings: Settings) -> None:
         allow_methods=ALLOWED_METHODS,
         allow_headers=ALLOWED_HEADERS,
     )
-    # Added last so it is the outermost middleware and times the full request.
     application.add_middleware(RequestContextMiddleware)

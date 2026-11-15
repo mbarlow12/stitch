@@ -23,8 +23,6 @@ logger = logging.getLogger("stitch.seed")
 
 PRODUCER_NAME = "stitch-seed"
 
-# The canonical Region vocabulary the ETL emits (derived there from ISO3 country).
-# Seeding from the same set keeps the Region filter dropdown coherent locally.
 REGIONS = (
     "Africa",
     "Asia-Pacific",
@@ -50,10 +48,6 @@ def _seed(random_seed: int | None) -> int | None:
 
 
 def _source_key(seed_source: str, rng: random.Random) -> str:
-    """
-    Choose which discriminator `source` to use in source_data.
-    Env: SEED_SOURCE=gem|wm|rmi|llm|mixed
-    """
     if seed_source == "mixed":
         return rng.choice(["gem", "wm", "rmi", "llm"])
     if seed_source in {"gem", "wm", "rmi", "llm"}:
@@ -62,10 +56,6 @@ def _source_key(seed_source: str, rng: random.Random) -> str:
 
 
 def _year_triplet(rng: random.Random) -> tuple[int | None, int | None, int | None]:
-    """
-    Keep within [1800, 2100] and order roughly: discovery <= start <= fid.
-    Allow occasional None to keep variety (schema says years may be nullable).
-    """
     if rng.random() < 0.1:
         return None, None, None
 
@@ -76,18 +66,15 @@ def _year_triplet(rng: random.Random) -> tuple[int | None, int | None, int | Non
 
 
 def _company(fake: Faker) -> str:
-    # Faker likes commas in company names; drop them to keep values simple.
     return fake.company().replace(",", "")
 
 
 def _fake_companyish(fake: Faker, rng: random.Random) -> str:
-    # Faker company names can be long; keep it a bit field-like.
     suffix = rng.choice(["Field", "Oil Field", "Gas Field", "Asset"])
     return f"{_company(fake)} {suffix}"
 
 
 def _stakes(rng: random.Random, count: int) -> list[float]:
-    """Split 100% across `count` parties, each > 0, summing to exactly 100."""
     weights = [rng.randint(1, 100) for _ in range(count)]
     total = sum(weights)
     shares = [round(w * 100 / total, 2) for w in weights]
@@ -98,12 +85,6 @@ def _stakes(rng: random.Random, count: int) -> list[float]:
 def _parties(
     fake: Faker, rng: random.Random, *, stated_stakes: bool
 ) -> list[dict[str, Any]]:
-    """
-    Ownership entries as `[{name, stake}]`.
-
-    `stake` is nullable upstream because most provider data is a bare company
-    name with no percentage; `stated_stakes=False` reproduces that shape.
-    """
     count = rng.randint(1, 3)
     names = [_company(fake) for _ in range(count)]
     if not stated_stakes:
@@ -123,10 +104,6 @@ def _null_probability(prob) -> float:
 
 
 def _maybe(value_fn, *, rng: random.Random, allow_null: bool = True, null_prob: float):
-    """
-    value_fn: callable producing a value
-    Returns None with probability NULL_PROBABILITY if allow_null=True.
-    """
     if allow_null and rng.random() < _null_probability(null_prob):
         return None
     return value_fn()
@@ -141,10 +118,8 @@ def build_og_field(
     discovery_year, production_start_year, fid_year = _year_triplet(rng)
 
     return {
-        # REQUIRED
         "name": name,
         "country": country,
-        # OPTIONAL — allow None
         "latitude": _maybe(
             lambda: float(fake.latitude()), rng=rng, null_prob=null_prob
         ),
@@ -159,8 +134,6 @@ def build_og_field(
         "basin": _maybe(
             lambda: f"{fake.word().title()} Basin", rng=rng, null_prob=null_prob
         ),
-        # Owners carry stated percentages, operators are names only — the two
-        # shapes real providers publish, so both `stake` paths get exercised.
         "owners": _maybe(
             lambda: _parties(fake, rng, stated_stakes=True),
             rng=rng,
@@ -211,9 +184,6 @@ def build_payload(
     run_id: str,
     index: int,
 ) -> dict[str, Any]:
-    """
-    POST body is Resource-Input (OpenAPI), which requires id.
-    """
     src = build_og_field(
         fake=fake, seed_source=seed_source, rng=rng, null_prob=null_prob
     )
@@ -295,13 +265,6 @@ def _attach_source_record(
 def _iter_static_payloads(
     static_payload_dir: str, run_id: str
 ) -> Iterator[dict[str, Any]]:
-    """
-    Load JSON payloads from a directory.
-    Each file may be either:
-      - a single payload object, or
-      - a list of payload objects.
-    Files are consumed in sorted(path) order for reproducibility.
-    """
     logger.info("Seeding Static Payloads")
     base = Path(static_payload_dir)
     if not base.exists():

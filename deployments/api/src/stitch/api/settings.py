@@ -82,16 +82,11 @@ class Settings(OTelSettings):
     git_sha: str | None = None
     build_time: str | None = None
 
-    # Observability: queries slower than this (ms) are logged individually;
-    # set log_all_queries=True (or slow_query_ms=0) to log every query in dev.
     log_level: str = "INFO"
     log_format: Literal["json", "plain"] = "json"
     slow_query_ms: float = 200.0
     log_all_queries: bool = False
 
-    # OpenTelemetry tracing settings (otel_enabled / otel_traces_exporter /
-    # otel_exporter_otlp_endpoint / otel_sample_ratio) are inherited from
-    # OTelSettings, shared across all services.
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env",

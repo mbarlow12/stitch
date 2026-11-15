@@ -1,18 +1,3 @@
-"""add og_field_resource_state read model
-
-Revision ID: 74c0d58cd642
-Revises: 901d261fce8b
-Create Date: 2026-10-22 00:00:00.000000
-
-Create the precomputed current-state read model (STIT-766):
-``og_field_resource_state``, one row per ``(resource, permission_mask)`` with the
-coalesced value of every ``OilGasFieldBase`` field plus a ``provenance`` map.
-
-Schema only: the table starts empty. It is derived data, filled by the
-application's rebuild (``python -m stitch.api.db.read_model.rebuild``, run outside
-Alembic because it reuses the app's async coalescer) and kept current by the
-write paths.
-"""
 
 from __future__ import annotations
 
@@ -20,7 +5,6 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql, sqlite
 
-# revision identifiers, used by Alembic.
 revision = "74c0d58cd642"
 down_revision = "901d261fce8b"
 branch_labels = None

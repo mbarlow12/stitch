@@ -11,11 +11,6 @@ from .settings import OIDCSettings
 
 
 def _extract_permissions(payload: dict[str, Any]) -> frozenset[str]:
-    """Extract RBAC permissions from the token payload.
-
-    Auth0-specific: reads the `permissions` array claim. To support another
-    IdP, dispatch here off OIDCSettings rather than expanding TokenClaims.
-    """
     if "permissions" not in payload or payload["permissions"] is None:
         return frozenset()
 

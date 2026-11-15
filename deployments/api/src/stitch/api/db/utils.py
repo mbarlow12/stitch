@@ -20,12 +20,8 @@ from .model import ResourceModel
 from .model.oil_gas_field_source_value import ATTRIBUTE_NAMES, materialize_value
 from .queries import coalesced_candidate_rows
 
-# Per-field coalesced provenance: field -> (winning value, source key, source id),
-# or None when no source carries a value for the field.
 type ProvMap = dict[str, tuple[Any, OGSISrcKey, int] | None]
 
-# One flat ``rn == 1`` winner row: (colname, value_text, value_num, value_json,
-# source, source_pk). The ranking is done in SQL; these carry the chosen value.
 type WinnerRow = tuple[str, Any, Any, Any, OGSISrcKey, int]
 
 
@@ -36,13 +32,6 @@ OG_FIELD_SOURCE_ADAPTER = TypeAdapter(OGFieldSource)
 def _view_and_provenance(
     winner_rows: Iterable[WinnerRow],
 ) -> tuple[OilGasFieldBase, ProvMap]:
-    """Build the coalesced view + provenance from already-ranked winner rows.
-
-    ``winner_rows`` is the ``rn == 1`` set (one row per field). The ranking --
-    the coalescing decision -- already happened in SQL; this only materializes
-    the typed value and records the winning source as provenance. Fields with no
-    winning row stay ``None``.
-    """
     provenance: ProvMap = {colname: None for colname in ATTRIBUTE_NAMES}
     for colname, value_text, value_num, value_json, source, source_pk in winner_rows:
         provenance[colname] = (
@@ -65,23 +54,10 @@ def _view_and_provenance(
 
 
 def _source_data_from_rows(rows: Sequence[Any]) -> list[OGFieldSource]:
-    """Rebuild the raw per-source entities from ranked candidate rows.
-
-    Groups the flat rows by ``source_pk`` (rank ignored -- every candidate row is
-    kept, not just winners) and reassembles each source's ``{field: value}`` plus
-    its ``source``/``source_record`` header. Rows arrive best-priority-first, so
-    the result is source-priority-ordered, matching the old listing.
-
-    A source carrying no value rows never appears here (it contributes no rows);
-    that matches "unset == absent" and differs only for the degenerate case of a
-    source with zero values.
-    """
     by_source: dict[int, dict[str, Any]] = {}
     for r in rows:
         entry = by_source.get(r.source_pk)
         if entry is None:
-            # Dense shape: seed every attribute to None (the long table is sparse,
-            # and the entity requires each field present), then fill what exists.
             entry = {colname: None for colname in ATTRIBUTE_NAMES}
             entry.update(
                 id=r.source_pk,
@@ -123,19 +99,6 @@ async def coalesce_resources_with_sources(
     resource_ids: Collection[int],
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> dict[int, OGFieldResource]:
-    """Detail-grade hydration for many resources in a SINGLE query.
-
-    One ``coalesced_candidate_rows`` query returns every ranked value row (joined to
-    its source header) for all requested ids; per resource we derive the
-    coalesced view + provenance (the ``rn == 1`` rows) and the raw ``source_data``
-    (all rows grouped by source). The SQL ranking stays the only coalescer -- the
-    ``rn == 1`` cut is a filter on a rank SQL already computed, not a second
-    coalesce.
-
-    Used wherever the raw per-source rows are needed: the single-resource detail
-    path (``resource_model_to_entity``) and the merge-candidate ``compare`` view.
-    The list reads precomputed rows instead (``read_model``).
-    """
     ids = list(dict.fromkeys(resource_ids))
     rows_by_id: dict[int, list[Any]] = {rid: [] for rid in ids}
     if ids:
@@ -167,12 +130,6 @@ async def resource_model_to_entity(
     model: ResourceModel,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> OGFieldResource:
-    """Build the full detail entity for one resource.
-
-    Hydrates view + provenance + ``source_data`` in a single query via
-    ``coalesce_resources_with_sources``, then layers on the model-derived
-    ``constituents`` and ``repointed_to``.
-    """
     base = (
         await coalesce_resources_with_sources(session, [model.id], licensed_sources)
     )[model.id]

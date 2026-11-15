@@ -65,8 +65,6 @@ def test_faker_payloads_populate_region_and_ownership() -> None:
     for operators in operator_lists:
         assert all(operator["stake"] is None for operator in operators)
 
-    # Everything generated must validate against the real model — including the
-    # null-stake entries that the now-nullable `stake` permits.
     adapter = TypeAdapter(OGFieldSource)
     for source in sources:
         adapter.validate_python(source)

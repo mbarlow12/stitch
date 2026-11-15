@@ -100,12 +100,6 @@ def _candidate_to_view(model: MergeCandidateModel) -> MergeCandidateView:
 
 
 def _comparison_status(resource_values: Sequence[Any]) -> str:
-    """``match`` if every resource resolves to the same value, else ``different``.
-
-    Compares each resource's coalesced value for a field. A value present on one
-    resource and null on another counts as ``different``; all-null counts as
-    ``match``. See ``FieldComparisonView``.
-    """
     first = resource_values[0] if resource_values else None
     return "match" if all(value == first for value in resource_values) else "different"
 
@@ -114,17 +108,6 @@ def _build_comparison(
     resource_views: Sequence[OilGasFieldBase],
     sources_with_priority: Sequence[tuple[int, OGFieldSource, int]],
 ) -> list[FieldComparisonView]:
-    """Per-field comparison across the candidate's resources.
-
-    For each ``OilGasFieldBase`` field, ``status`` compares the resources'
-    coalesced values (``resource_views``); ``values`` lists every source that
-    carries a value (winner-first by priority) tagged with the resource it is
-    attached to. See ``FieldComparisonView`` for the status semantics.
-
-    Values are a best guess at the persisted merge result: a merge drops any
-    per-resource overrides, so the merged resource can resolve to a value that
-    differs from any single parent's current winner.
-    """
     comparison: list[FieldComparisonView] = []
     for field_name in OilGasFieldBase.model_fields:
         values: list[ComparisonValueView] = []
@@ -132,8 +115,6 @@ def _build_comparison(
             if source.id is None:
                 continue
             value = getattr(source, field_name, None)
-            # None means "unset". Empty strings can't be persisted (write-path
-            # skip + DB CHECK), so a null check alone captures every real value.
             if value is None:
                 continue
             values.append(
@@ -146,13 +127,6 @@ def _build_comparison(
                 )
             )
         values.sort(key=lambda entry: (entry.priority, entry.source_id))
-        # `values` rank by the DEFAULT global source order (what the merged
-        # resource will use -- a merge drops per-resource overrides), while
-        # `status` reflects each resource's current effective coalesced value.
-        # These can already differ whenever a per-resource priority override is
-        # active (the coalescer uses COALESCE(override, default)): values[0] is
-        # the post-merge winner, not necessarily the resource's current one.
-        # Expected, not a bug.
         resource_values = [getattr(view, field_name, None) for view in resource_views]
         comparison.append(
             FieldComparisonView(
@@ -165,11 +139,6 @@ def _build_comparison(
 
 
 async def _default_source_priority(session: AsyncSession) -> dict[str, int]:
-    """Global default source ordering (``source`` key -> priority, lower wins).
-
-    A merge resets the merged resource to this default order, so the comparison
-    ranks sources by it rather than by any per-resource override.
-    """
     rows = await session.execute(
         select(OGFieldSourcePriority.source, OGFieldSourcePriority.priority)
     )
@@ -181,16 +150,6 @@ def _ordered_resource_ids(model: MergeCandidateModel) -> list[int]:
 
 
 def _candidate_name_column(permission_mask: int) -> ColumnElement[str | None]:
-    """A candidate's display name, as SQL over the resource-state read model, so
-    the list can both return and sort by it and the detail view names its
-    candidate the same way. See ``MergeCandidateListItemView.name``.
-
-    The merged resource's name wins once approved; otherwise the name of the
-    candidate's first resource (by position) that has one. Names come from the
-    caller's permission profile and only the read model's ``name`` column is
-    read. The read model only holds listable resources, so a merged-away
-    original has no row and the merged resource names its candidate.
-    """
     state = OGFieldResourceState
     item = MergeCandidateItemModel
     candidate = MergeCandidateModel
@@ -230,8 +189,6 @@ def _candidate_to_detail_view(
     name: str | None,
     compare: Sequence[FieldComparisonView],
 ) -> MergeCandidateDetailView:
-    # MergeCandidateDetailView is the list item + `compare`; reuse the base
-    # mapping so the shared fields stay defined in one place.
     return MergeCandidateDetailView(
         **_candidate_to_list_item_view(model, name).model_dump(),
         compare=list(compare),
@@ -254,8 +211,6 @@ async def _load_candidate_model(
     return model
 
 
-# Work still to do first: candidates awaiting review, then denied, then
-# approved.
 _STATUS_SORT_RANK = {
     MergeCandidateStatus.PENDING: 0,
     MergeCandidateStatus.DENIED: 1,
@@ -266,12 +221,9 @@ _STATUS_SORT_RANK = {
 def _list_order(
     params: MergeCandidateQueryParams, name: ColumnElement[str | None]
 ) -> tuple[ColumnElement[Any], ...]:
-    """ORDER BY for the list. ``id`` always ends it, so pages stay stable when
-    candidates share a sort value (bulk creation, equal names)."""
     if params.sort_by == "status":
         status_rank = case(_STATUS_SORT_RANK, value=MergeCandidateModel.status)
         rank = status_rank.asc() if params.sort_order == "asc" else status_rank.desc()
-        # Newest first within each status, whichever way the groups run.
         return (
             rank,
             MergeCandidateModel.created.desc(),
@@ -288,18 +240,10 @@ def _list_order(
     return (sort_column.desc().nulls_last(), MergeCandidateModel.id.desc())
 
 
-# Postgres bigint; a larger number cannot be a resource id (and would overflow
-# the comparison).
 _MAX_RESOURCE_ID = 2**63 - 1
 
 
 def _as_resource_id(q: str) -> int | None:
-    """``q`` as a resource id, or ``None`` when it cannot be one.
-
-    Only ASCII digits count (``str.isdigit`` also accepts e.g. "²", which
-    ``int`` rejects), and the length check keeps ``int`` away from strings past
-    Python's integer-conversion limit.
-    """
     if not (q.isascii() and q.isdigit()) or len(q) > len(str(_MAX_RESOURCE_ID)):
         return None
     value = int(q)
@@ -307,23 +251,6 @@ def _as_resource_id(q: str) -> int | None:
 
 
 def _candidate_search_condition(q: str, permission_mask: int) -> ColumnElement[bool]:
-    """Candidates matching ``q``; see ``MergeCandidateFilterParams.q``.
-
-    Text matching is the field list's own ``q`` search over the read model, so
-    it sees the caller's permission profile. The read model only holds listable
-    resources, so an approved candidate's merged-away originals cannot match
-    by text; its merged resource can.
-
-    A numeric ``q`` matches the candidate's own resource ids directly, without
-    the read model, so it does find merged-away originals. That is deliberate:
-    searching an old resource id shows the candidate that merged it. Leading
-    zeros are ignored, so "0042" matches resource 42.
-
-    Known gap: text only reaches a candidate through resources that are still
-    listable. Once a later approval merges them away (an approved candidate's
-    merged resource merged again, or a denied candidate's resources merged by
-    another candidate), that candidate is found only by resource id.
-    """
     matching = (
         resource_state_query(OGFieldQueryParams(q=q), permission_mask)
         .order_by(None)
@@ -350,7 +277,6 @@ async def list_merge_candidates(
     params: MergeCandidateQueryParams,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> MergeCandidatePage:
-    """One page of merge candidates, with whole-queue counts by status."""
     mask = profile_mask(licensed_sources)
     name = _candidate_name_column(mask).label("name")
     conditions = []
@@ -403,7 +329,6 @@ async def list_merge_candidates(
 async def existing_candidate_resource_sets(
     session: AsyncSession,
 ) -> set[frozenset[int]]:
-    """The resource set of every merge candidate, whatever its status."""
     stmt = select(MergeCandidateModel).options(selectinload(MergeCandidateModel.items))
     with named_query("merge_candidates.resource_sets"):
         candidates = (await session.scalars(stmt)).all()
@@ -418,31 +343,17 @@ async def get_merge_candidate(
     candidate_id: int,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> MergeCandidateDetailView:
-    # Resolved first, so a caller with no read-model profile is refused (403)
-    # before any work is done.
     name_column = _candidate_name_column(profile_mask(licensed_sources))
     with named_query("merge_candidates.detail.load"):
         candidate = await _load_candidate_model(session, candidate_id)
 
     resource_ids = _ordered_resource_ids(candidate)
 
-    # Computed live: repointed (post-merge) resources coalesce to a null-shell
-    # here, so an APPROVED candidate's `compare` reflects the emptied originals.
-    # Freezing a snapshot at approve/deny time is deferred.
-    #
-    # Invariant: every resource_id still exists -- merge_candidate_items FK to
-    # og_field_resources and resources are never hard-deleted (merges repoint,
-    # never delete). So a null-shell view always means "emptied by a merge",
-    # never "missing"; no existence check is needed here. Revisit if a resource
-    # hard-delete path is ever added.
     with named_query("merge_candidates.detail.coalesce"):
         by_id = await coalesce_resources_with_sources(
             session, resource_ids, licensed_sources
         )
 
-    # `status` compares the resources' coalesced values; `values` lists every
-    # contributing source tagged with the resource it's attached to, ranked by
-    # the default source order (winner-first).
     with named_query("merge_candidates.detail.default_priority"):
         default_priority = await _default_source_priority(session)
     fallback_priority = max(default_priority.values(), default=0) + 1
@@ -546,27 +457,7 @@ async def _reroute_pending_candidates(
     merged_away_ids: Sequence[int],
     new_id: int,
 ) -> None:
-    """Repoint other PENDING candidates off resources that a merge just consumed.
-
-    Approving a candidate merges ``merged_away_ids`` into the brand-new resource
-    ``new_id`` and repoints the originals. Any *other* PENDING candidate that
-    still references one of those originals would otherwise be stranded: its
-    comparison would coalesce an emptied null-shell, and its own approval would
-    fail the already-merged guard, leaving Deny as the only (dishonest) exit.
-
-    Instead, rewrite each such candidate in place to reference ``new_id``. It
-    stays PENDING and reviewable, and because ``get_merge_candidate`` builds the
-    comparison live from the stored item rows, the review pane immediately shows
-    ``new_id``'s current values. Rides the caller's transaction.
-
-    Call this *after* the approved candidate has been marked APPROVED: the query
-    below autoflushes that status change, so the ``status == PENDING`` filter
-    excludes it on its own and no explicit exclude id is needed.
-    """
     merged_away = set(merged_away_ids)
-    # Targeted query: only candidates that actually reference a merged-away
-    # resource can be stale, so join through the items and filter on
-    # ``resource_id`` rather than scanning every PENDING candidate.
     stmt = (
         select(MergeCandidateModel)
         .join(
@@ -584,37 +475,19 @@ async def _reroute_pending_candidates(
     if not candidates:
         return
 
-    # A rerouted candidate always contains new_id, which is brand-new, so its
-    # fingerprint cannot collide with any pre-existing candidate -- only with
-    # another candidate rerouted in this same pass (e.g. A+C and B+C both become
-    # D+C). Track survivors' member sets and drop later duplicates: they are now
-    # the identical proposal. Order by id so the survivor is deterministic.
     kept: set[str] = set()
     for candidate in sorted(candidates, key=lambda c: c.id):
-        # Rewrite each merged-away member to new_id. If a candidate held more than
-        # one merged-away id (e.g. approving A+B collapses a member of A+B+C),
-        # they all collapse to new_id; drop the duplicate items to respect the
-        # (candidate, resource_id) unique constraint.
         seen_ids: set[int] = set()
         new_ids: list[int] = []
         for item in sorted(candidate.items, key=lambda i: i.position):
             target = new_id if item.resource_id in merged_away else item.resource_id
             if target in seen_ids:
-                # Removing from the delete-orphan collection deletes the row on
-                # flush and keeps candidate.items consistent in memory.
                 candidate.items.remove(item)
                 continue
             item.resource_id = target
             seen_ids.add(target)
             new_ids.append(target)
 
-        # Delete the candidate when it can no longer stand on its own:
-        #   * fewer than two members -- it was a subset of the approved candidate
-        #     (e.g. A+B when A+B+C is approved), collapsed to just [new_id], and a
-        #     single-member candidate can never be approved (_normalize_resource_ids
-        #     requires >=2). It is fully subsumed by the approval anyway.
-        #   * a member set already kept this pass -- it is now the identical
-        #     proposal as an earlier survivor.
         fingerprint = _fingerprint(new_ids)
         if len(new_ids) < 2 or fingerprint in kept:
             await session.delete(candidate)
@@ -655,8 +528,6 @@ async def approve_merge_candidate(
     candidate.last_updated_by_id = user.id
     candidate.merged_resource_id = merged_resource.id
 
-    # Reroute after marking this candidate APPROVED: the reroute query autoflushes
-    # the status change, so its PENDING filter excludes this candidate on its own.
     await _reroute_pending_candidates(
         session=session,
         user=user,

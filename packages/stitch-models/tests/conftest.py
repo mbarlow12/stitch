@@ -1,4 +1,3 @@
-"""Minimal test doubles and fixtures for stitch-models."""
 
 from __future__ import annotations
 
@@ -18,10 +17,6 @@ from stitch.models import (
     SourcePayload,
 )
 
-# ---------------------------------------------------------------------------
-# Source doubles — each specializes to exactly one id type, matching the
-# design intent that a given source uses only int, str, or UUID.
-# ---------------------------------------------------------------------------
 
 
 class FooSource(Source[int, Literal["foo"]]):
@@ -43,9 +38,6 @@ class UuidSource(Source[UUID, Literal["uuid_src"]]):
     source: Literal["uuid_src"] = "uuid_src"
 
 
-# ---------------------------------------------------------------------------
-# Payload doubles
-# ---------------------------------------------------------------------------
 
 
 class FooPayload(SourcePayload):
@@ -61,9 +53,6 @@ class UuidPayload(SourcePayload):
     uuids: Mapping[UUID, UuidSource] = Field(default_factory=dict)
 
 
-# ---------------------------------------------------------------------------
-# Resource doubles
-# ---------------------------------------------------------------------------
 
 
 class EmptyPayload(SourcePayload):
@@ -93,9 +82,6 @@ class ResourceWithSrcUnion(Resource[int, TestSrcUnion]):
     res_c: str
 
 
-# ---------------------------------------------------------------------------
-# ORM-like doubles (plain objects with attributes, for from_attributes tests)
-# ---------------------------------------------------------------------------
 
 
 class FooSourceORM:
@@ -118,9 +104,6 @@ class BarSourceORM:
         self.source_record = source_record
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture

@@ -1,15 +1,8 @@
-"""enforce unique og_field_memberships (resource_id, source_pk)
-
-Revision ID: 901d261fce8b
-Revises: 71aa7ef8150b
-Create Date: 2026-10-09 00:00:00.000000
-"""
 
 from __future__ import annotations
 
 from alembic import op
 
-# revision identifiers, used by Alembic.
 revision = "901d261fce8b"
 down_revision = "71aa7ef8150b"
 branch_labels = None

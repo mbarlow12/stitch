@@ -1,4 +1,3 @@
-"""Resource & SourcePayload subclassing and validation tests."""
 
 from __future__ import annotations
 
@@ -30,9 +29,6 @@ def assert_has_error(errors: list[dict], *, type: str, loc: tuple) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# SourcePayload subclassing
-# ---------------------------------------------------------------------------
 
 
 class TestSourcePayloadSubclassing:
@@ -68,9 +64,6 @@ class TestSourcePayloadSubclassing:
         assert payload.uuids[uid].id == uid
 
 
-# ---------------------------------------------------------------------------
-# Resource subclassing
-# ---------------------------------------------------------------------------
 
 
 class TestResourceSubclassing:
@@ -80,7 +73,6 @@ class TestResourceSubclassing:
         assert resource.source_data.foos[1].value == 3.14
 
     def test_ingestion_defaults(self, foo_payload):
-        """Ingestion context: id, repointed_to, and constituents all default."""
         resource = FooResource(source_data=foo_payload)
         assert resource.id is None
         assert resource.repointed_to is None
@@ -96,7 +88,6 @@ class TestResourceSubclassing:
         assert isinstance(resource.constituents, frozenset)
 
     def test_repointed_to_and_constituents_independent(self, foo_payload):
-        """Both can be set simultaneously — they are independent fields."""
         resource = FooResource(
             id=1, source_data=foo_payload, repointed_to=99, constituents={2, 3}
         )
@@ -141,9 +132,6 @@ class TestResourceSubclassingDiscriminatedUnion:
         assert errs[0]["loc"] == ("source_data", 0, "bar", "label")
 
 
-# ---------------------------------------------------------------------------
-# Resource & Payload validation
-# ---------------------------------------------------------------------------
 
 
 class TestResourceValidation:

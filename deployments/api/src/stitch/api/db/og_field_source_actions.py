@@ -32,9 +32,7 @@ async def create_source(
     user: User,
     source: OGFieldSource,
 ) -> OGFieldSource:
-    """Validate raw JSON into domain model, persist canonical + original."""
 
-    # domain validation (pydantic)
     model = OilGasFieldSourceModel.create_from_entity(source, created_by=user)
 
     session.add(model)
@@ -46,19 +44,6 @@ async def create_source(
 async def _get_attachable_resource(
     session: AsyncSession, resource_id: int
 ) -> ResourceModel:
-    """Lock and fetch a resource that is a valid attachment target.
-
-    The row lock is taken before anything is read or written for the attach,
-    and held to the end of the transaction: concurrent writes to the resource
-    then queue here, and the resource is re-read after locking, so a merge that
-    committed while we waited is seen (rather than attaching to a resource that
-    was just merged away).
-
-    Raises:
-        ResourceNotFoundError: if no resource exists for ``resource_id``.
-        ResourceIntegrityError: if the resource has been merged (repointed);
-            memberships on it would never surface in coalescing/queries.
-    """
     await lock_resources(session, [resource_id])
     resource = await session.get(ResourceModel, resource_id, populate_existing=True)
     if resource is None:
@@ -77,34 +62,11 @@ async def create_and_attach_sources(
     sources: Sequence[OGFieldSource],
     resource_id: int,
 ) -> Sequence[OGFieldSource]:
-    """Create new sources and attach them to an existing resource.
-
-    Each source is always created (never resolved by id here), then linked to
-    ``resource_id`` via an ACTIVE membership, all within the caller's unit of
-    work. The resource is validated first, so an invalid target fails before any
-    source is written.
-
-    Args:
-        session: db session (transaction context)
-        user: the logged in User (recorded as creator)
-        sources: raw source data; none may carry an ``id``
-        resource_id: the resource to attach the new sources to
-
-    Returns:
-        The created OGFieldSources, each with its assigned id, in input order.
-
-    Raises:
-        SourceIntegrityError: if any source carries a non-None id.
-        ResourceNotFoundError: if ``resource_id`` does not exist.
-        ResourceIntegrityError: if the resource has been merged (repointed).
-    """
     supplied_ids = [src.id for src in sources if src.id is not None]
     if supplied_ids:
         raise SourceIntegrityError(
             f"Cannot create sources with client-supplied ids: {supplied_ids}"
         )
-    # Fail fast: validate the target before creating any source, so an invalid
-    # resource_id never leaves a source insert to roll back.
     with named_query("sources.create_and_attach"):
         resource = await _get_attachable_resource(session, resource_id)
         models = await _create_source_models(session, user, sources)
@@ -118,16 +80,6 @@ async def create_and_attach_source(
     source: OGFieldSource,
     resource_id: int,
 ) -> OGFieldSource:
-    """Create a single source and attach it to an existing resource.
-
-    Thin convenience wrapper over :func:`create_and_attach_sources` for the
-    common single-source path; see that function for full semantics.
-
-    Raises:
-        SourceIntegrityError: if ``source`` carries a non-None id.
-        ResourceNotFoundError: if ``resource_id`` does not exist.
-        ResourceIntegrityError: if the resource has been merged (repointed).
-    """
     [created] = await create_and_attach_sources(session, user, [source], resource_id)
     return created
 
@@ -190,12 +142,6 @@ async def _attach_source_models(
     src_models: Sequence[OilGasFieldSourceModel],
     user: User,
 ) -> None:
-    """Create ACTIVE memberships linking each source model to ``resource``.
-
-    The single place the attach paths (create, attach, create-and-attach) add
-    memberships, so it also refreshes the resource's read-model state in the
-    same transaction.
-    """
     already_attached = set(
         (
             await session.scalars(
@@ -230,7 +176,6 @@ async def attach_sources_to_resource(
     source_rows: Sequence[OGFieldSource],
     user: User,
 ) -> OGFieldResource:
-    """Link an OG field source to a resource via membership."""
     with named_query("sources.attach"):
         resource = await _get_attachable_resource(session, resource_id)
         if len(source_rows) < 1:
@@ -254,7 +199,6 @@ async def get_source(
     if model is None:
         raise SourceNotFoundError(f"No OG Field Source found for id `{id}`")
     if licensed_sources is not None and model.source not in licensed_sources:
-        # Hide existence of unlicensed source rows.
         raise SourceNotFoundError(f"No OG Field Source found for id `{id}`")
     return model.as_entity()
 
@@ -281,7 +225,6 @@ async def query(
     params: OGFieldQueryParams,
     licensed_sources: Collection[OGSISrcKey] | None = None,
 ) -> tuple[Sequence[OGFieldSource], int]:
-    """Filtered/sorted/paginated source records (id-ordered) plus total count."""
     stmt = base_source_query(params, licensed_sources)
     count_stmt = select(func.count()).select_from(stmt.subquery())
     with named_query("sources.count"):

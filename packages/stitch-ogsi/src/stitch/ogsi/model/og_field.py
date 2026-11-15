@@ -95,13 +95,6 @@ class OilGasFieldBase(BaseModel):
     """Current status of the field."""
 
 
-# Canonical names of the coalesced ``OilGasFieldBase`` fields, as a Literal so
-# API boundaries (path params, request models) validate a field name at the
-# schema level -- returning a 422 with the allowed set instead of failing deeper
-# in the query layer -- and so the allowed values are self-documenting in the
-# OpenAPI spec. Spelled out because a Literal cannot be built dynamically for
-# static typing; the runtime check below fails fast if it ever drifts from
-# ``OilGasFieldBase`` (mirroring the ``ATTRIBUTE_KINDS`` guard in the API layer).
 OGFieldName = Literal[
     "name",
     "country",

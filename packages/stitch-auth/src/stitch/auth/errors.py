@@ -2,7 +2,7 @@ from collections.abc import Iterable
 
 
 class AuthError(Exception):
-    """Base for all auth errors. Consumers can catch broadly or narrowly."""
+    ...
 
 
 class TokenExpiredError(AuthError): ...

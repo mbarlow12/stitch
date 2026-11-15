@@ -1,13 +1,3 @@
-"""SQLAlchemy query timing via engine cursor-execute events.
-
-Attaches to the single ``AsyncEngine``'s underlying sync engine (the chokepoint
-every query flows through) and times each statement. Slow statements (or all
-statements when ``log_all_queries`` is set) are emitted via the query sink;
-every statement updates the per-request aggregate in :mod:`context`.
-
-Bound parameter values are intentionally **not** captured — only the
-parameterized statement text — to avoid logging PII or large payloads.
-"""
 
 import re
 
@@ -23,9 +13,9 @@ from stitch.observability.middleware import (
 from .context import db_stats_var, query_name_var
 from .sinks import emit_query_event
 
-try:  # py3.12+: monotonic, nanosecond resolution
+try:
     from time import perf_counter
-except ImportError:  # pragma: no cover - perf_counter always present on 3.12
+except ImportError:
     from time import monotonic as perf_counter
 
 _START_KEY = "_stitch_query_start"
@@ -33,10 +23,6 @@ _WHITESPACE = re.compile(r"\s+")
 
 
 def _normalize_statement(statement: str, max_chars: int) -> str:
-    # NB: statements longer than max_chars are truncated to a shared prefix, so
-    # queries that differ only past the cutoff (large IN (...) lists, big CTEs)
-    # collapse into one group in the analyzer. Acceptable tradeoff; documented in
-    # deployments/PERFORMANCE.md so users aren't surprised by merged rows.
     collapsed = _WHITESPACE.sub(" ", statement).strip()
     if len(collapsed) > max_chars:
         return collapsed[:max_chars] + "…"
@@ -50,12 +36,6 @@ def register_query_timing(
     log_all_queries: bool = False,
     statement_max_chars: int = 2000,
 ) -> None:
-    """Register before/after cursor-execute listeners on ``sync_engine``.
-
-    Pass ``engine.sync_engine`` for an ``AsyncEngine``. Idempotent per engine is
-    not guaranteed — call once per engine (``get_engine`` is ``lru_cache``'d, so
-    that holds in practice).
-    """
 
     @event.listens_for(sync_engine, "before_cursor_execute")
     def _before(conn, cursor, statement, parameters, context, executemany):
@@ -63,9 +43,6 @@ def register_query_timing(
 
     @event.listens_for(sync_engine, "handle_error")
     def _on_error(exc_context):
-        # after_cursor_execute does not fire when execution raises, so pop the
-        # start time the before-hook pushed; otherwise it leaks and corrupts the
-        # timing of the next query on this connection.
         conn = exc_context.connection
         if conn is None:
             return
@@ -90,7 +67,7 @@ def register_query_timing(
 
         try:
             rowcount = cursor.rowcount
-        except Exception:  # pragma: no cover - driver dependent
+        except Exception:
             rowcount = None
 
         event = {
@@ -102,9 +79,6 @@ def register_query_timing(
             "route": route_var.get(),
             "scenario": scenario_var.get(),
         }
-        # Optional label from the active ``named_query`` scope. Omitted entirely
-        # when unset so existing log consumers see no new field for unlabeled
-        # queries.
         if (query_name := query_name_var.get()) is not None:
             event["query_name"] = query_name
         emit_query_event(event)

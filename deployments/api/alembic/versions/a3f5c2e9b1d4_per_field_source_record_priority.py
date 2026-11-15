@@ -1,25 +1,9 @@
-"""per-field per-source-record priority overrides
-
-Revision ID: a3f5c2e9b1d4
-Revises: 790b2078d706
-Create Date: 2026-07-20 00:00:00.000000
-
-Re-key ``og_field_resource_source_priority`` from the per-``(resource, source)``
-grain to the per-``(resource, source_pk, colname)`` grain so a curator can re-rank
-sources for a single field, per source *record*. Adds ``source_pk``/``colname`` to
-the primary key, keeps ``source`` as a ranking tiebreak + known-key FK, and adds
-lightweight audit columns.
-
-The table is empty and had no writer before this change, so it is dropped and
-recreated rather than doing a cross-dialect primary-key-alter dance.
-"""
 
 from __future__ import annotations
 
 from alembic import op
 import sqlalchemy as sa
 
-# revision identifiers, used by Alembic.
 revision = "a3f5c2e9b1d4"
 down_revision = "790b2078d706"
 branch_labels = None

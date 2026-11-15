@@ -1,4 +1,3 @@
-"""Building, refreshing, and rebuilding the resource-state read model."""
 
 from __future__ import annotations
 
@@ -83,8 +82,6 @@ class TestBuilderParity:
     async def test_stored_state_matches_the_coalescer(
         self, seeded_integration_session: AsyncSession, rebuilt: Dataset, mask: int
     ):
-        """Each stored row is what the detail view's coalescer computes for the
-        same resource and sources."""
         session = seeded_integration_session
         stored = await dump_state(session)
         ids = sorted(rebuilt.listable)
@@ -94,13 +91,11 @@ class TestBuilderParity:
 
         for rid in ids:
             row = stored[(rid, mask)]
-            # Raw values, including their Python types (int vs float, JSON lists).
             for field in ATTRIBUTE_NAMES:
                 winner = coalesced[rid].provenance[field]
                 expected = None if winner is None else winner[0]
                 assert row[field] == expected, (rid, mask, field)
                 assert type(row[field]) is type(expected), (rid, mask, field)
-            # The list item the read path will build from the row.
             assert _stored_item(rid, row) == resource_to_list_item_view(coalesced[rid])
 
     async def test_restricted_values_only_appear_in_profiles_that_see_them(
@@ -151,7 +146,6 @@ class TestBuilderParity:
         stored = await dump_state(seeded_integration_session)
         epsilon = {mask: stored[(rebuilt.epsilon, mask)] for mask in PERMISSION_MASKS}
         assert {epsilon[m]["name"] for m in PERMISSION_MASKS} == {"Epsilon NOR"}
-        # By default wm outranks ccr; the override puts ccr first.
         assert [epsilon[m]["basin"] for m in (0, 1, 2, 3)] == [
             None,
             "CCR Basin",
@@ -215,10 +209,6 @@ class TestTargetedRefresh:
     async def test_writes_all_rows_in_one_insert(
         self, seeded_integration_session: AsyncSession, dataset: Dataset
     ):
-        # Resources leave different fields empty. If the empty fields were left
-        # out of each row, rows would stop sharing columns and go out as one
-        # INSERT (one database round trip) each, which made production rebuilds
-        # take hours.
         session = seeded_integration_session
         inserts: list[str] = []
 
@@ -262,8 +252,6 @@ class TestLocking:
         )
         assert "FROM og_field_resources" in sql
         assert "IN (10, 20, 30)" in sql
-        # NO KEY UPDATE, not UPDATE: it mustn't conflict with the key-share
-        # locks that inserting rows referencing a resource takes.
         assert sql.rstrip().endswith(
             "ORDER BY og_field_resources.id FOR NO KEY UPDATE"
         ), sql
@@ -340,9 +328,6 @@ class TestFullRebuild:
         integration_session_factory: SessionFactory,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """Batches finished before the failure stay; every resource keeps its
-        rows (rebuilt or from before), so reads never see a gap. Running it
-        again finishes the job."""
         session = seeded_integration_session
         pristine = await dump_state(session)
         await _corrupt(session, rebuilt.alpha)
@@ -363,7 +348,6 @@ class TestFullRebuild:
 
         after = await dump_state(session)
         assert set(after) == set(pristine)
-        # alpha (the lowest id) was the first batch, which finished.
         assert after[(rebuilt.alpha, 0)] == pristine[(rebuilt.alpha, 0)]
 
         monkeypatch.setattr(state, "_compute_state_rows", real_compute)
@@ -372,9 +356,6 @@ class TestFullRebuild:
 
 
 class TestValuesTodaysModelRejects:
-    """Stored values can predate today's validation (e.g. a country code that
-    is no longer valid). Building state must not validate them: one such value
-    would otherwise stop every full rebuild from finishing."""
 
     async def test_full_rebuild_completes(
         self,

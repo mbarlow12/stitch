@@ -1,8 +1,3 @@
-"""Smoke tests for stitch-ogsi compositional patterns.
-
-These tests verify that the domain-specific models compose correctly
-on top of stitch-models generics.  They also serve as usage examples.
-"""
 
 from __future__ import annotations
 from collections.abc import Sequence
@@ -27,15 +22,11 @@ from stitch.ogsi.model import OilGasOperator, OilGasOwner
 from stitch.ogsi.model.og_field import OilGasFieldBase
 
 
-# ---------------------------------------------------------------------------
-# Discriminated union
-# ---------------------------------------------------------------------------
 
 _source_adapter = TypeAdapter(OGFieldSource)
 
 
 class TestOGFieldSourceDiscriminator:
-    """OGFieldSource routes JSON to the correct Source subclass."""
 
     def test_gem_source_from_json(self):
         obj = _source_adapter.validate_json(
@@ -111,13 +102,9 @@ class TestOGFieldSourceDiscriminator:
         )
 
 
-# ---------------------------------------------------------------------------
-# Ownership
-# ---------------------------------------------------------------------------
 
 
 class TestOwnershipStake:
-    """`stake` is optional: providers often name a party without a percentage."""
 
     @pytest.mark.parametrize("model", [OilGasOwner, OilGasOperator])
     def test_stake_defaults_to_none_when_omitted(self, model):
@@ -159,20 +146,15 @@ class TestOwnershipStake:
         assert OilGasFieldBase.model_validate(dumped) == field
 
 
-# ---------------------------------------------------------------------------
-# Resource (multiple-inheritance mixin)
-# ---------------------------------------------------------------------------
 
 
 class TestOGFieldResource:
-    """OGFieldResource combines OilAndGasFieldBase + Resource fields."""
 
     def test_has_both_base_class_fields(self, og_payload: Sequence[OGFieldSource]):
         resource = OGFieldResource(
             id=1,
             source_data=og_payload,
         )
-        # Resource fields
         assert resource.id == 1
         assert resource.source_data == og_payload
         assert resource.repointed_to is None

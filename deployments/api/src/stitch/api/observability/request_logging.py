@@ -1,12 +1,3 @@
-"""Per-request timing middleware for the API.
-
-A thin extension of the shared ``RequestContextMiddleware``: the generic
-request-id / scenario / span-tagging / request-summary plumbing lives in the
-package, and this only grafts on the API's aggregated per-request DB query
-count / time. It establishes the ``db_stats`` dict before the request runs so
-the SQLAlchemy query-timing listener accumulates into it, then contributes the
-totals to the request-summary log event.
-"""
 
 from stitch.observability.middleware import RequestContextMiddleware
 
