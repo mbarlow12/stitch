@@ -2324,7 +2324,9 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "griffelib", extra = ["faster"] },
     { name = "pytest" },
+    { name = "rich" },
     { name = "ruff" },
 ]
 
@@ -2332,7 +2334,9 @@ dev = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "griffelib", extras = ["faster"], specifier = ">=2.4.1" },
     { name = "pytest", specifier = ">=9.2.0" },
+    { name = "rich", specifier = ">=15.0.0" },
     { name = "ruff", specifier = ">=0.17.3" },
 ]
 

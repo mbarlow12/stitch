@@ -3,24 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from griffe import Alias, Attribute, Class, Function, Kind, load
-
-from ._target import resolve_target
-
-if TYPE_CHECKING:
-    from griffe import Object
-
-__all__ = [
-    "DEFAULT_EXCLUDES",
-    "TOP_LEVEL_KINDS",
-    "api_surface_markdown",
-    "directory_surface_markdown",
-    "public_members",
-    "resolve_target",
-    "signature_of",
-]
+from griffe import Alias, Attribute, Class, Function, Kind, Object, load
 
 TOP_LEVEL_KINDS = (Kind.FUNCTION, Kind.CLASS, Kind.ATTRIBUTE)
 
@@ -39,6 +23,29 @@ DEFAULT_EXCLUDES = (
     "alembic",
     "migrations",
 )
+
+
+def _spec_from_path(path: Path) -> tuple[str, Path]:
+    resolved = path.resolve()
+    if resolved.name == "__init__.py":
+        resolved = resolved.parent
+    parts = [resolved.stem if resolved.is_file() else resolved.name]
+    parent = resolved.parent
+    while (parent / "__init__.py").exists():
+        parts.append(parent.name)
+        parent = parent.parent
+    return ".".join(reversed(parts)), parent
+
+
+def resolve_target(
+    target: str, search_paths: Sequence[str | Path] = ()
+) -> tuple[str, list[Path] | None]:
+    roots = [Path(path).resolve() for path in search_paths]
+    path = Path(target)
+    if path.exists():
+        name, root = _spec_from_path(path)
+        return name, [root, *roots]
+    return target, roots or None
 
 
 def public_members(

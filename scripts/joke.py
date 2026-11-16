@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-
-__all__ = ["responses_joke"]
 
 
 def _metadata(rows: dict[str, str]) -> Table:
@@ -60,5 +59,4 @@ async def _joke(topic: str) -> None:
     console.print()
 
 
-def responses_joke(topic: str) -> None:
-    asyncio.run(_joke(topic))
+asyncio.run(_joke(sys.argv[1]))
