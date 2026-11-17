@@ -129,10 +129,7 @@ class Repository[TEntity, TId: int | UUID, TKey: str, TMeta: object](Protocol):
     async def query(
         self, limit: int, offset: int, *args, **kwargs
     ) -> Collection[StoredItem]:
-        """
-        - add sort params
-        - need an interface to execute custom queries?
-        """
+        ...
 
     async def update(self, entity: StoredItem) -> StoredItem: ...
 
@@ -178,14 +175,6 @@ class SARepository[Ent, TId, Row: Base](ABC):
         self._to_entity = data_to_entity
         self._insert_values = entity_to_data
 
-    # async def get(self, key: TId) -> Ent | None:
-    #     row = await self._session.get(self._orm_model, key)
-    #     return self._to_entity(row) if row is not None else None
-    #
-    # async def create(self, entity: Ent) -> None:
-    #     row = self._insert_values(entity).__dict__
-    #     stmt = insert(self._orm_model).values(**row)
-    #     await self._session.execute(stmt)
 
 
 class SqlResourceRepository(
